@@ -21,10 +21,17 @@ type DataInfo = {start: BigInt, end: BigInt, uploading: BigInt, endSize: BigInt}
 
 async function uploadDIDDocument(
   data: Buffer,
-  appClient: ApplicationClient,
+  appID: number,
   address: string,
   sender: algosdk.Account,
 ): Promise<Buffer[]> {
+  const appClient = new ApplicationClient({
+    resolveBy: 'id',
+    id: appID,
+    sender,
+    app: JSON.stringify(appSpec),
+  }, algodClient);
+
   const numBoxes = Math.floor(data.byteLength / 32768);
   const boxData: Buffer[] = [];
 
@@ -36,7 +43,6 @@ async function uploadDIDDocument(
   boxData.push(data.subarray(numBoxes * 32768, data.byteLength));
 
   const suggestedParams = await algodClient.getTransactionParams().do();
-  const appID = Number((await appClient.getAppReference()).appId);
 
   const boxPromises = boxData.map(async (box, boxIndex) => {
     const numChunks = Math.ceil(box.byteLength / BYTES_PER_CALL);
@@ -155,7 +161,8 @@ describe('Big Box', () => {
   });
 
   test('upload', async () => {
-    const boxData = await uploadDIDDocument(data, appClient, sender.addr, sender);
+    const { appId } = await appClient.getAppReference();
+    const boxData = await uploadDIDDocument(data, Number(appId), sender.addr, sender);
 
     const boxValuePromises = boxData
       .map(async (_, boxIndex) => appClient.getBoxValue(algosdk.encodeUint64(boxIndex)));
