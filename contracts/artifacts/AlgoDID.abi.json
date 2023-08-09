@@ -6,9 +6,9 @@
       "name": "startUpload",
       "args": [
         {
-          "name": "dataIdentifier",
-          "type": "string",
-          "desc": "The unique identifier for the data"
+          "name": "address",
+          "type": "address",
+          "desc": "The address of the DID"
         },
         {
           "name": "numBoxes",
@@ -36,9 +36,9 @@
       "name": "upload",
       "args": [
         {
-          "name": "dataIdentifier",
-          "type": "string",
-          "desc": "The unique identifier for the data"
+          "name": "address",
+          "type": "address",
+          "desc": "The address of the DID"
         },
         {
           "name": "boxIndex",
@@ -63,20 +63,15 @@
       }
     },
     {
-      "name": "setStatus",
+      "name": "finishUpload",
       "args": [
         {
-          "name": "dataIdentifier",
-          "type": "string",
-          "desc": "The unique identifier for the data"
-        },
-        {
-          "name": "status",
-          "type": "uint8",
-          "desc": "The new status for the data"
+          "name": "address",
+          "type": "address",
+          "desc": "The address of the DID"
         }
       ],
-      "desc": "Set the status of the data",
+      "desc": "Mark uploading as false",
       "returns": {
         "type": "void",
         "desc": ""

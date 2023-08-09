@@ -26,17 +26,17 @@ import { SendTransactionResult, TransactionToSign, SendTransactionFrom } from '@
 import { Algodv2, OnApplicationComplete, Transaction, TransactionWithSigner, AtomicTransactionComposer } from 'algosdk'
 export const APP_SPEC: AppSpec = {
   "hints": {
-    "startUpload(string,uint64,uint64,pay)void": {
+    "startUpload(address,uint64,uint64,pay)void": {
       "call_config": {
         "no_op": "CALL"
       }
     },
-    "upload(string,uint64,uint64,byte[])void": {
+    "upload(address,uint64,uint64,byte[])void": {
       "call_config": {
         "no_op": "CALL"
       }
     },
-    "setStatus(string,uint8)void": {
+    "finishUpload(address)void": {
       "call_config": {
         "no_op": "CALL"
       }
@@ -75,7 +75,7 @@ export const APP_SPEC: AppSpec = {
     }
   },
   "source": {
-    "approval": "I3ByYWdtYSB2ZXJzaW9uIDkKCnR4biBBcHBsaWNhdGlvbklECmludCAwCj4KaW50IDYKKgp0eG4gT25Db21wbGV0aW9uCisKc3dpdGNoIGNyZWF0ZV9Ob09wIE5PVF9JTVBMRU1FTlRFRCBOT1RfSU1QTEVNRU5URUQgTk9UX0lNUExFTUVOVEVEIE5PVF9JTVBMRU1FTlRFRCBOT1RfSU1QTEVNRU5URUQgY2FsbF9Ob09wCgpOT1RfSU1QTEVNRU5URUQ6CgllcnIKCmFiaV9yb3V0ZV9zdGFydFVwbG9hZDoKCWJ5dGUgMHgKCWR1cG4gMwoJdHhuIEdyb3VwSW5kZXgKCWludCAxCgktCgl0eG5hIEFwcGxpY2F0aW9uQXJncyAzCglidG9pCgl0eG5hIEFwcGxpY2F0aW9uQXJncyAyCglidG9pCgl0eG5hIEFwcGxpY2F0aW9uQXJncyAxCglleHRyYWN0IDIgMAoJY2FsbHN1YiBzdGFydFVwbG9hZAoJaW50IDEKCXJldHVybgoKc3RhcnRVcGxvYWQ6Cglwcm90byA4IDAKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo0NwoJLy8gc3RhcnRCb3ggPSB0aGlzLmN1cnJlbnRJbmRleC5nZXQoKQoJYnl0ZSAiY3VycmVudEluZGV4IgoJYXBwX2dsb2JhbF9nZXQKCWZyYW1lX2J1cnkgLTUgLy8gc3RhcnRCb3g6IHVpbnQ2NAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjQ4CgkvLyBlbmRCb3ggPSBzdGFydEJveCArIG51bUJveGVzIC0gMQoJZnJhbWVfZGlnIC01IC8vIHN0YXJ0Qm94OiB1aW50NjQKCWZyYW1lX2RpZyAtMiAvLyBudW1Cb3hlczogdWludDY0CgkrCglpbnQgMQoJLQoJZnJhbWVfYnVyeSAtNiAvLyBlbmRCb3g6IHVpbnQ2NAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjUwCgkvLyBtZXRhZGF0YTogTWV0YWRhdGEgPSB7CglmcmFtZV9kaWcgLTUgLy8gc3RhcnRCb3g6IHVpbnQ2NAoJaXRvYgoJYnl0ZSAweEZGRkZGRkZGRkZGRkZGRkYKCWImCglkdXBuIDIKCWJ5dGUgMHhGRkZGRkZGRkZGRkZGRkZGCgliPD0KCWFzc2VydAoJbGVuCglpbnQgOAoJLQoJaW50IDgKCWV4dHJhY3QzCglmcmFtZV9kaWcgLTYgLy8gZW5kQm94OiB1aW50NjQKCWl0b2IKCWJ5dGUgMHhGRkZGRkZGRkZGRkZGRkZGCgliJgoJZHVwbiAyCglieXRlIDB4RkZGRkZGRkZGRkZGRkZGRgoJYjw9Cglhc3NlcnQKCWxlbgoJaW50IDgKCS0KCWludCA4CglleHRyYWN0MwoJY29uY2F0CglieXRlIDB4MDAKCWJ5dGUgMHhGRgoJYiYKCWR1cG4gMgoJYnl0ZSAweEZGCgliPD0KCWFzc2VydAoJbGVuCglpbnQgMQoJLQoJaW50IDEKCWV4dHJhY3QzCgljb25jYXQKCWZyYW1lX2RpZyAtMyAvLyBlbmRCb3hTaXplOiB1aW50NjQKCWl0b2IKCWJ5dGUgMHhGRkZGRkZGRkZGRkZGRkZGCgliJgoJZHVwbiAyCglieXRlIDB4RkZGRkZGRkZGRkZGRkZGRgoJYjw9Cglhc3NlcnQKCWxlbgoJaW50IDgKCS0KCWludCA4CglleHRyYWN0MwoJY29uY2F0CglmcmFtZV9idXJ5IC03IC8vIG1ldGFkYXRhOiBNZXRhZGF0YQoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjU0CgkvLyBhc3NlcnQoIXRoaXMubWV0YWRhdGEuZXhpc3RzKGRhdGFJZGVudGlmaWVyKSkKCWZyYW1lX2RpZyAtMSAvLyBkYXRhSWRlbnRpZmllcjogYnl0ZXMKCWJveF9sZW4KCXN3YXAKCXBvcAoJIQoJYXNzZXJ0CgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NTYKCS8vIHRoaXMubWV0YWRhdGEuc2V0KGRhdGFJZGVudGlmaWVyLCBtZXRhZGF0YSkKCWZyYW1lX2RpZyAtMSAvLyBkYXRhSWRlbnRpZmllcjogYnl0ZXMKCWZyYW1lX2RpZyAtNyAvLyBtZXRhZGF0YTogTWV0YWRhdGEKCWJveF9wdXQKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo1OAoJLy8gdGhpcy5jdXJyZW50SW5kZXguc2V0KGVuZEJveCArIDEpCglieXRlICJjdXJyZW50SW5kZXgiCglmcmFtZV9kaWcgLTYgLy8gZW5kQm94OiB1aW50NjQKCWludCAxCgkrCglhcHBfZ2xvYmFsX3B1dAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjYwCgkvLyB0b3RhbENvc3QgPSBudW1Cb3hlcyAqIENPU1RfUEVSX0JPWCAvLyBjb3N0IG9mIGJveGVzCglmcmFtZV9kaWcgLTIgLy8gbnVtQm94ZXM6IHVpbnQ2NAoJaW50IDI1MDAKCSoKCWZyYW1lX2RpZyAtMiAvLyBudW1Cb3hlczogdWludDY0CglpbnQgMQoJLQoJaW50IDMyNzY4CgkqCglpbnQgNDAwCgkqCgkrCglmcmFtZV9kaWcgLTIgLy8gbnVtQm94ZXM6IHVpbnQ2NAoJaW50IDY0CgkqCglpbnQgNDAwCgkqCgkrCglmcmFtZV9kaWcgLTMgLy8gZW5kQm94U2l6ZTogdWludDY0CglpbnQgNDAwCgkqCgkrCglmcmFtZV9idXJ5IC04IC8vIHRvdGFsQ29zdDogdWludDY0CgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NjUKCS8vIGFzc2VydChtYnJQYXltZW50LmFtb3VudCA9PT0gdG90YWxDb3N0KQoJZnJhbWVfZGlnIC00IC8vIG1iclBheW1lbnQ6IHBheQoJZ3R4bnMgQW1vdW50CglmcmFtZV9kaWcgLTggLy8gdG90YWxDb3N0OiB1aW50NjQKCT09Cglhc3NlcnQKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo2NgoJLy8gYXNzZXJ0KG1iclBheW1lbnQucmVjZWl2ZXIgPT09IHRoaXMuYXBwLmFkZHJlc3MpCglmcmFtZV9kaWcgLTQgLy8gbWJyUGF5bWVudDogcGF5CglndHhucyBSZWNlaXZlcgoJdHhuYSBBcHBsaWNhdGlvbnMgMAoJYXBwX3BhcmFtc19nZXQgQXBwQWRkcmVzcwoJYXNzZXJ0Cgk9PQoJYXNzZXJ0CglyZXRzdWIKCmFiaV9yb3V0ZV91cGxvYWQ6CglieXRlIDB4Cgl0eG5hIEFwcGxpY2F0aW9uQXJncyA0CglleHRyYWN0IDIgMAoJdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMwoJYnRvaQoJdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMgoJYnRvaQoJdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMQoJZXh0cmFjdCAyIDAKCWNhbGxzdWIgdXBsb2FkCglpbnQgMQoJcmV0dXJuCgp1cGxvYWQ6Cglwcm90byA1IDAKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo3OQoJLy8gbWV0YWRhdGEgPSB0aGlzLm1ldGFkYXRhLmdldChkYXRhSWRlbnRpZmllcikKCWZyYW1lX2RpZyAtMSAvLyBkYXRhSWRlbnRpZmllcjogYnl0ZXMKCWZyYW1lX2J1cnkgLTUgLy8gc3RvcmFnZSBrZXkvL21ldGFkYXRhCgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6ODAKCS8vIGFzc2VydChtZXRhZGF0YS5zdGF0dXMgPT09IElOX1BST0dSRVNTKQoJZnJhbWVfZGlnIC01IC8vIHN0b3JhZ2Uga2V5Ly9tZXRhZGF0YQoJYm94X2dldAoJYXNzZXJ0CglzdG9yZSAwIC8vIGZ1bGwgYXJyYXkKCWludCAwIC8vIGluaXRpYWwgb2Zmc2V0CglpbnQgMTYgLy8gaGVhZE9mZnNldAoJKwoJbG9hZCAwIC8vIGZ1bGwgYXJyYXkKCXN3YXAKCWludCAxCglleHRyYWN0MwoJYnl0ZSAweDAwCgliPT0KCWFzc2VydAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjgxCgkvLyBhc3NlcnQobWV0YWRhdGEuc3RhcnQgPD0gYm94SW5kZXggJiYgYm94SW5kZXggPD0gbWV0YWRhdGEuZW5kKQoJZnJhbWVfZGlnIC01IC8vIHN0b3JhZ2Uga2V5Ly9tZXRhZGF0YQoJYm94X2dldAoJYXNzZXJ0CglzdG9yZSAwIC8vIGZ1bGwgYXJyYXkKCWludCAwIC8vIGluaXRpYWwgb2Zmc2V0CglpbnQgMCAvLyBoZWFkT2Zmc2V0CgkrCglsb2FkIDAgLy8gZnVsbCBhcnJheQoJc3dhcAoJaW50IDgKCWV4dHJhY3QzCglidG9pCglmcmFtZV9kaWcgLTIgLy8gYm94SW5kZXg6IHVpbnQ2NAoJPD0KCWR1cAoJYnogc2tpcF9hbmQwCglmcmFtZV9kaWcgLTIgLy8gYm94SW5kZXg6IHVpbnQ2NAoJZnJhbWVfZGlnIC01IC8vIHN0b3JhZ2Uga2V5Ly9tZXRhZGF0YQoJYm94X2dldAoJYXNzZXJ0CglzdG9yZSAwIC8vIGZ1bGwgYXJyYXkKCWludCAwIC8vIGluaXRpYWwgb2Zmc2V0CglpbnQgOCAvLyBoZWFkT2Zmc2V0CgkrCglsb2FkIDAgLy8gZnVsbCBhcnJheQoJc3dhcAoJaW50IDgKCWV4dHJhY3QzCglidG9pCgk8PQoJJiYKCnNraXBfYW5kMDoKCWFzc2VydAoKCS8vIGlmMF9jb25kaXRpb24KCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjgzCgkvLyBvZmZzZXQgPT09IDAKCWZyYW1lX2RpZyAtMyAvLyBvZmZzZXQ6IHVpbnQ2NAoJaW50IDAKCT09CglieiBpZjBfZW5kCgoJLy8gaWYwX2NvbnNlcXVlbnQKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjg0CgkvLyB0aGlzLmRhdGFCb3hlcy5jcmVhdGUoYm94SW5kZXgsIGJveEluZGV4ID09PSBtZXRhZGF0YS5lbmQgPyBtZXRhZGF0YS5lbmRTaXplIDogTUFYX0JPWF9TSVpFKQoJZnJhbWVfZGlnIC0yIC8vIGJveEluZGV4OiB1aW50NjQKCWl0b2IKCWZyYW1lX2RpZyAtMiAvLyBib3hJbmRleDogdWludDY0CglmcmFtZV9kaWcgLTUgLy8gc3RvcmFnZSBrZXkvL21ldGFkYXRhCglib3hfZ2V0Cglhc3NlcnQKCXN0b3JlIDAgLy8gZnVsbCBhcnJheQoJaW50IDAgLy8gaW5pdGlhbCBvZmZzZXQKCWludCA4IC8vIGhlYWRPZmZzZXQKCSsKCWxvYWQgMCAvLyBmdWxsIGFycmF5Cglzd2FwCglpbnQgOAoJZXh0cmFjdDMKCWJ0b2kKCT09CglieiB0ZXJuYXJ5MF9mYWxzZQoJZnJhbWVfZGlnIC01IC8vIHN0b3JhZ2Uga2V5Ly9tZXRhZGF0YQoJYm94X2dldAoJYXNzZXJ0CglzdG9yZSAwIC8vIGZ1bGwgYXJyYXkKCWludCAwIC8vIGluaXRpYWwgb2Zmc2V0CglpbnQgMTcgLy8gaGVhZE9mZnNldAoJKwoJbG9hZCAwIC8vIGZ1bGwgYXJyYXkKCXN3YXAKCWludCA4CglleHRyYWN0MwoJYnRvaQoJYiB0ZXJuYXJ5MF9lbmQKCnRlcm5hcnkwX2ZhbHNlOgoJaW50IDMyNzY4Cgp0ZXJuYXJ5MF9lbmQ6Cglib3hfY3JlYXRlCgppZjBfZW5kOgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6ODcKCS8vIHRoaXMuZGF0YUJveGVzLnJlcGxhY2UoYm94SW5kZXgsIG9mZnNldCwgZGF0YSkKCWZyYW1lX2RpZyAtMiAvLyBib3hJbmRleDogdWludDY0CglpdG9iCglmcmFtZV9kaWcgLTMgLy8gb2Zmc2V0OiB1aW50NjQKCWZyYW1lX2RpZyAtNCAvLyBkYXRhOiBieXRlcwoJYm94X3JlcGxhY2UKCXJldHN1YgoKYWJpX3JvdXRlX3NldFN0YXR1czoKCWJ5dGUgMHgKCXR4bmEgQXBwbGljYXRpb25BcmdzIDIKCXR4bmEgQXBwbGljYXRpb25BcmdzIDEKCWV4dHJhY3QgMiAwCgljYWxsc3ViIHNldFN0YXR1cwoJaW50IDEKCXJldHVybgoKc2V0U3RhdHVzOgoJcHJvdG8gMyAwCgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6OTgKCS8vIGN1cnJlbnRTdGF0dXMgPSB0aGlzLm1ldGFkYXRhLmdldChkYXRhSWRlbnRpZmllcikuc3RhdHVzCglmcmFtZV9kaWcgLTEgLy8gZGF0YUlkZW50aWZpZXI6IGJ5dGVzCglib3hfZ2V0Cglhc3NlcnQKCWZyYW1lX2RpZyAtMSAvLyBkYXRhSWRlbnRpZmllcjogYnl0ZXMKCWJveF9nZXQKCWFzc2VydAoJc3RvcmUgMCAvLyBmdWxsIGFycmF5CglpbnQgMCAvLyBpbml0aWFsIG9mZnNldAoJaW50IDE2IC8vIGhlYWRPZmZzZXQKCSsKCWxvYWQgMCAvLyBmdWxsIGFycmF5Cglzd2FwCglpbnQgMQoJZXh0cmFjdDMKCWZyYW1lX2J1cnkgLTMgLy8gY3VycmVudFN0YXR1czogdWludDgKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czoxMDAKCS8vIGFzc2VydChzdGF0dXMgPT09IFJFQURZIHx8IHN0YXR1cyA9PT0gSU1NVVRBQkxFIHx8IHN0YXR1cyA9PT0gSU5fUFJPR1JFU1MpCglmcmFtZV9kaWcgLTIgLy8gc3RhdHVzOiB1aW50OAoJYnl0ZSAweDAxCgliPT0KCWR1cAoJYm56IHNraXBfb3IwCglmcmFtZV9kaWcgLTIgLy8gc3RhdHVzOiB1aW50OAoJYnl0ZSAweDAyCgliPT0KCXx8Cgpza2lwX29yMDoKCWR1cAoJYm56IHNraXBfb3IxCglmcmFtZV9kaWcgLTIgLy8gc3RhdHVzOiB1aW50OAoJYnl0ZSAweDAwCgliPT0KCXx8Cgpza2lwX29yMToKCWFzc2VydAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjEwMQoJLy8gYXNzZXJ0KGN1cnJlbnRTdGF0dXMgIT09IElNTVVUQUJMRSkKCWZyYW1lX2RpZyAtMyAvLyBjdXJyZW50U3RhdHVzOiB1aW50OAoJYnl0ZSAweDAyCgliIT0KCWFzc2VydAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjEwMwoJLy8gdGhpcy5tZXRhZGF0YS5nZXQoZGF0YUlkZW50aWZpZXIpLnN0YXR1cyA9IHN0YXR1cwoJZnJhbWVfZGlnIC0xIC8vIGRhdGFJZGVudGlmaWVyOiBieXRlcwoJYm94X2dldAoJYXNzZXJ0CglzdG9yZSAwIC8vIGZ1bGwgYXJyYXkKCWludCAwIC8vIGluaXRpYWwgb2Zmc2V0CglpbnQgMTYgLy8gaGVhZE9mZnNldAoJKwoJbG9hZCAwIC8vIGZ1bGwgYXJyYXkKCXN3YXAKCWZyYW1lX2RpZyAtMiAvLyBzdGF0dXM6IHVpbnQ4CglyZXBsYWNlMwoJZnJhbWVfZGlnIC0xIC8vIGRhdGFJZGVudGlmaWVyOiBieXRlcwoJc3dhcAoJYm94X3B1dAoJcmV0c3ViCgphYmlfcm91dGVfZGVmYXVsdFRFQUxTY3JpcHRDcmVhdGU6CglpbnQgMQoJcmV0dXJuCgpjcmVhdGVfTm9PcDoKCXR4biBOdW1BcHBBcmdzCglzd2l0Y2ggYWJpX3JvdXRlX2RlZmF1bHRURUFMU2NyaXB0Q3JlYXRlCgllcnIKCmNhbGxfTm9PcDoKCW1ldGhvZCAic3RhcnRVcGxvYWQoc3RyaW5nLHVpbnQ2NCx1aW50NjQscGF5KXZvaWQiCgltZXRob2QgInVwbG9hZChzdHJpbmcsdWludDY0LHVpbnQ2NCxieXRlW10pdm9pZCIKCW1ldGhvZCAic2V0U3RhdHVzKHN0cmluZyx1aW50OCl2b2lkIgoJdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMAoJbWF0Y2ggYWJpX3JvdXRlX3N0YXJ0VXBsb2FkIGFiaV9yb3V0ZV91cGxvYWQgYWJpX3JvdXRlX3NldFN0YXR1cwoJZXJy",
+    "approval": "I3ByYWdtYSB2ZXJzaW9uIDkKCnR4biBBcHBsaWNhdGlvbklECmludCAwCj4KaW50IDYKKgp0eG4gT25Db21wbGV0aW9uCisKc3dpdGNoIGNyZWF0ZV9Ob09wIE5PVF9JTVBMRU1FTlRFRCBOT1RfSU1QTEVNRU5URUQgTk9UX0lNUExFTUVOVEVEIE5PVF9JTVBMRU1FTlRFRCBOT1RfSU1QTEVNRU5URUQgY2FsbF9Ob09wCgpOT1RfSU1QTEVNRU5URUQ6CgllcnIKCmFiaV9yb3V0ZV9zdGFydFVwbG9hZDoKCWJ5dGUgMHgKCWR1cG4gMwoJdHhuIEdyb3VwSW5kZXgKCWludCAxCgktCgl0eG5hIEFwcGxpY2F0aW9uQXJncyAzCglidG9pCgl0eG5hIEFwcGxpY2F0aW9uQXJncyAyCglidG9pCgl0eG5hIEFwcGxpY2F0aW9uQXJncyAxCgljYWxsc3ViIHN0YXJ0VXBsb2FkCglpbnQgMQoJcmV0dXJuCgpzdGFydFVwbG9hZDoKCXByb3RvIDggMAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjQyCgkvLyBzdGFydEJveCA9IHRoaXMuY3VycmVudEluZGV4LmdldCgpCglieXRlICJjdXJyZW50SW5kZXgiCglhcHBfZ2xvYmFsX2dldAoJZnJhbWVfYnVyeSAtNSAvLyBzdGFydEJveDogdWludDY0CgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NDMKCS8vIGVuZEJveCA9IHN0YXJ0Qm94ICsgbnVtQm94ZXMgLSAxCglmcmFtZV9kaWcgLTUgLy8gc3RhcnRCb3g6IHVpbnQ2NAoJZnJhbWVfZGlnIC0yIC8vIG51bUJveGVzOiB1aW50NjQKCSsKCWludCAxCgktCglmcmFtZV9idXJ5IC02IC8vIGVuZEJveDogdWludDY0CgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NDUKCS8vIG1ldGFkYXRhOiBNZXRhZGF0YSA9IHsKCWZyYW1lX2RpZyAtNSAvLyBzdGFydEJveDogdWludDY0CglpdG9iCglieXRlIDB4RkZGRkZGRkZGRkZGRkZGRgoJYiYKCWR1cG4gMgoJYnl0ZSAweEZGRkZGRkZGRkZGRkZGRkYKCWI8PQoJYXNzZXJ0CglsZW4KCWludCA4CgktCglpbnQgOAoJZXh0cmFjdDMKCWZyYW1lX2RpZyAtNiAvLyBlbmRCb3g6IHVpbnQ2NAoJaXRvYgoJYnl0ZSAweEZGRkZGRkZGRkZGRkZGRkYKCWImCglkdXBuIDIKCWJ5dGUgMHhGRkZGRkZGRkZGRkZGRkZGCgliPD0KCWFzc2VydAoJbGVuCglpbnQgOAoJLQoJaW50IDgKCWV4dHJhY3QzCgljb25jYXQKCWJ5dGUgMHgwMQoJY29uY2F0CglmcmFtZV9kaWcgLTMgLy8gZW5kQm94U2l6ZTogdWludDY0CglpdG9iCglieXRlIDB4RkZGRkZGRkZGRkZGRkZGRgoJYiYKCWR1cG4gMgoJYnl0ZSAweEZGRkZGRkZGRkZGRkZGRkYKCWI8PQoJYXNzZXJ0CglsZW4KCWludCA4CgktCglpbnQgOAoJZXh0cmFjdDMKCWNvbmNhdAoJZnJhbWVfYnVyeSAtNyAvLyBtZXRhZGF0YTogTWV0YWRhdGEKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo0OQoJLy8gYXNzZXJ0KCF0aGlzLm1ldGFkYXRhLmV4aXN0cyhhZGRyZXNzKSkKCWZyYW1lX2RpZyAtMSAvLyBhZGRyZXNzOiBhZGRyZXNzCglib3hfbGVuCglzd2FwCglwb3AKCSEKCWFzc2VydAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjUxCgkvLyB0aGlzLm1ldGFkYXRhLnNldChhZGRyZXNzLCBtZXRhZGF0YSkKCWZyYW1lX2RpZyAtMSAvLyBhZGRyZXNzOiBhZGRyZXNzCglmcmFtZV9kaWcgLTcgLy8gbWV0YWRhdGE6IE1ldGFkYXRhCglib3hfcHV0CgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NTMKCS8vIHRoaXMuY3VycmVudEluZGV4LnNldChlbmRCb3ggKyAxKQoJYnl0ZSAiY3VycmVudEluZGV4IgoJZnJhbWVfZGlnIC02IC8vIGVuZEJveDogdWludDY0CglpbnQgMQoJKwoJYXBwX2dsb2JhbF9wdXQKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo1NQoJLy8gdG90YWxDb3N0ID0gbnVtQm94ZXMgKiBDT1NUX1BFUl9CT1ggLy8gY29zdCBvZiBib3hlcwoJZnJhbWVfZGlnIC0yIC8vIG51bUJveGVzOiB1aW50NjQKCWludCAyNTAwCgkqCglmcmFtZV9kaWcgLTIgLy8gbnVtQm94ZXM6IHVpbnQ2NAoJaW50IDEKCS0KCWludCAzMjc2OAoJKgoJaW50IDQwMAoJKgoJKwoJZnJhbWVfZGlnIC0yIC8vIG51bUJveGVzOiB1aW50NjQKCWludCA2NAoJKgoJaW50IDQwMAoJKgoJKwoJZnJhbWVfZGlnIC0zIC8vIGVuZEJveFNpemU6IHVpbnQ2NAoJaW50IDQwMAoJKgoJKwoJZnJhbWVfYnVyeSAtOCAvLyB0b3RhbENvc3Q6IHVpbnQ2NAoKCS8vIGNvbnRyYWN0cy9hbGdvLWRpZC5hbGdvLnRzOjYwCgkvLyBhc3NlcnQobWJyUGF5bWVudC5hbW91bnQgPT09IHRvdGFsQ29zdCkKCWZyYW1lX2RpZyAtNCAvLyBtYnJQYXltZW50OiBwYXkKCWd0eG5zIEFtb3VudAoJZnJhbWVfZGlnIC04IC8vIHRvdGFsQ29zdDogdWludDY0Cgk9PQoJYXNzZXJ0CgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NjEKCS8vIGFzc2VydChtYnJQYXltZW50LnJlY2VpdmVyID09PSB0aGlzLmFwcC5hZGRyZXNzKQoJZnJhbWVfZGlnIC00IC8vIG1iclBheW1lbnQ6IHBheQoJZ3R4bnMgUmVjZWl2ZXIKCXR4bmEgQXBwbGljYXRpb25zIDAKCWFwcF9wYXJhbXNfZ2V0IEFwcEFkZHJlc3MKCWFzc2VydAoJPT0KCWFzc2VydAoJcmV0c3ViCgphYmlfcm91dGVfdXBsb2FkOgoJYnl0ZSAweAoJdHhuYSBBcHBsaWNhdGlvbkFyZ3MgNAoJZXh0cmFjdCAyIDAKCXR4bmEgQXBwbGljYXRpb25BcmdzIDMKCWJ0b2kKCXR4bmEgQXBwbGljYXRpb25BcmdzIDIKCWJ0b2kKCXR4bmEgQXBwbGljYXRpb25BcmdzIDEKCWNhbGxzdWIgdXBsb2FkCglpbnQgMQoJcmV0dXJuCgp1cGxvYWQ6Cglwcm90byA1IDAKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo3NAoJLy8gbWV0YWRhdGEgPSB0aGlzLm1ldGFkYXRhLmdldChhZGRyZXNzKQoJZnJhbWVfZGlnIC0xIC8vIGFkZHJlc3M6IGFkZHJlc3MKCWZyYW1lX2J1cnkgLTUgLy8gc3RvcmFnZSBrZXkvL21ldGFkYXRhCgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NzUKCS8vIGFzc2VydChtZXRhZGF0YS51cGxvYWRpbmcgPT09IDx1aW50PDg+PjEpCglmcmFtZV9kaWcgLTUgLy8gc3RvcmFnZSBrZXkvL21ldGFkYXRhCglib3hfZ2V0Cglhc3NlcnQKCXN0b3JlIDAgLy8gZnVsbCBhcnJheQoJaW50IDAgLy8gaW5pdGlhbCBvZmZzZXQKCWludCAxNiAvLyBoZWFkT2Zmc2V0CgkrCglsb2FkIDAgLy8gZnVsbCBhcnJheQoJc3dhcAoJaW50IDEKCWV4dHJhY3QzCglieXRlIDB4MDEKCWI9PQoJYXNzZXJ0CgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NzYKCS8vIGFzc2VydChtZXRhZGF0YS5zdGFydCA8PSBib3hJbmRleCAmJiBib3hJbmRleCA8PSBtZXRhZGF0YS5lbmQpCglmcmFtZV9kaWcgLTUgLy8gc3RvcmFnZSBrZXkvL21ldGFkYXRhCglib3hfZ2V0Cglhc3NlcnQKCXN0b3JlIDAgLy8gZnVsbCBhcnJheQoJaW50IDAgLy8gaW5pdGlhbCBvZmZzZXQKCWludCAwIC8vIGhlYWRPZmZzZXQKCSsKCWxvYWQgMCAvLyBmdWxsIGFycmF5Cglzd2FwCglpbnQgOAoJZXh0cmFjdDMKCWJ0b2kKCWZyYW1lX2RpZyAtMiAvLyBib3hJbmRleDogdWludDY0Cgk8PQoJZHVwCglieiBza2lwX2FuZDAKCWZyYW1lX2RpZyAtMiAvLyBib3hJbmRleDogdWludDY0CglmcmFtZV9kaWcgLTUgLy8gc3RvcmFnZSBrZXkvL21ldGFkYXRhCglib3hfZ2V0Cglhc3NlcnQKCXN0b3JlIDAgLy8gZnVsbCBhcnJheQoJaW50IDAgLy8gaW5pdGlhbCBvZmZzZXQKCWludCA4IC8vIGhlYWRPZmZzZXQKCSsKCWxvYWQgMCAvLyBmdWxsIGFycmF5Cglzd2FwCglpbnQgOAoJZXh0cmFjdDMKCWJ0b2kKCTw9CgkmJgoKc2tpcF9hbmQwOgoJYXNzZXJ0CgoJLy8gaWYwX2NvbmRpdGlvbgoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NzgKCS8vIG9mZnNldCA9PT0gMAoJZnJhbWVfZGlnIC0zIC8vIG9mZnNldDogdWludDY0CglpbnQgMAoJPT0KCWJ6IGlmMF9lbmQKCgkvLyBpZjBfY29uc2VxdWVudAoJLy8gY29udHJhY3RzL2FsZ28tZGlkLmFsZ28udHM6NzkKCS8vIHRoaXMuZGF0YUJveGVzLmNyZWF0ZShib3hJbmRleCwgYm94SW5kZXggPT09IG1ldGFkYXRhLmVuZCA/IG1ldGFkYXRhLmVuZFNpemUgOiBNQVhfQk9YX1NJWkUpCglmcmFtZV9kaWcgLTIgLy8gYm94SW5kZXg6IHVpbnQ2NAoJaXRvYgoJZnJhbWVfZGlnIC0yIC8vIGJveEluZGV4OiB1aW50NjQKCWZyYW1lX2RpZyAtNSAvLyBzdG9yYWdlIGtleS8vbWV0YWRhdGEKCWJveF9nZXQKCWFzc2VydAoJc3RvcmUgMCAvLyBmdWxsIGFycmF5CglpbnQgMCAvLyBpbml0aWFsIG9mZnNldAoJaW50IDggLy8gaGVhZE9mZnNldAoJKwoJbG9hZCAwIC8vIGZ1bGwgYXJyYXkKCXN3YXAKCWludCA4CglleHRyYWN0MwoJYnRvaQoJPT0KCWJ6IHRlcm5hcnkwX2ZhbHNlCglmcmFtZV9kaWcgLTUgLy8gc3RvcmFnZSBrZXkvL21ldGFkYXRhCglib3hfZ2V0Cglhc3NlcnQKCXN0b3JlIDAgLy8gZnVsbCBhcnJheQoJaW50IDAgLy8gaW5pdGlhbCBvZmZzZXQKCWludCAxNyAvLyBoZWFkT2Zmc2V0CgkrCglsb2FkIDAgLy8gZnVsbCBhcnJheQoJc3dhcAoJaW50IDgKCWV4dHJhY3QzCglidG9pCgliIHRlcm5hcnkwX2VuZAoKdGVybmFyeTBfZmFsc2U6CglpbnQgMzI3NjgKCnRlcm5hcnkwX2VuZDoKCWJveF9jcmVhdGUKCmlmMF9lbmQ6CgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo4MgoJLy8gdGhpcy5kYXRhQm94ZXMucmVwbGFjZShib3hJbmRleCwgb2Zmc2V0LCBkYXRhKQoJZnJhbWVfZGlnIC0yIC8vIGJveEluZGV4OiB1aW50NjQKCWl0b2IKCWZyYW1lX2RpZyAtMyAvLyBvZmZzZXQ6IHVpbnQ2NAoJZnJhbWVfZGlnIC00IC8vIGRhdGE6IGJ5dGVzCglib3hfcmVwbGFjZQoJcmV0c3ViCgphYmlfcm91dGVfZmluaXNoVXBsb2FkOgoJLy8gbm8gZHVwbiBuZWVkZWQKCXR4bmEgQXBwbGljYXRpb25BcmdzIDEKCWNhbGxzdWIgZmluaXNoVXBsb2FkCglpbnQgMQoJcmV0dXJuCgpmaW5pc2hVcGxvYWQ6Cglwcm90byAxIDAKCgkvLyBjb250cmFjdHMvYWxnby1kaWQuYWxnby50czo5MgoJLy8gdGhpcy5tZXRhZGF0YS5nZXQoYWRkcmVzcykudXBsb2FkaW5nID0gMAoJZnJhbWVfZGlnIC0xIC8vIGFkZHJlc3M6IGFkZHJlc3MKCWJveF9nZXQKCWFzc2VydAoJc3RvcmUgMCAvLyBmdWxsIGFycmF5CglpbnQgMCAvLyBpbml0aWFsIG9mZnNldAoJaW50IDE2IC8vIGhlYWRPZmZzZXQKCSsKCWxvYWQgMCAvLyBmdWxsIGFycmF5Cglzd2FwCglpbnQgMAoJaXRvYgoJcmVwbGFjZTMKCWZyYW1lX2RpZyAtMSAvLyBhZGRyZXNzOiBhZGRyZXNzCglzd2FwCglib3hfcHV0CglyZXRzdWIKCmFiaV9yb3V0ZV9kZWZhdWx0VEVBTFNjcmlwdENyZWF0ZToKCWludCAxCglyZXR1cm4KCmNyZWF0ZV9Ob09wOgoJdHhuIE51bUFwcEFyZ3MKCXN3aXRjaCBhYmlfcm91dGVfZGVmYXVsdFRFQUxTY3JpcHRDcmVhdGUKCWVycgoKY2FsbF9Ob09wOgoJbWV0aG9kICJzdGFydFVwbG9hZChhZGRyZXNzLHVpbnQ2NCx1aW50NjQscGF5KXZvaWQiCgltZXRob2QgInVwbG9hZChhZGRyZXNzLHVpbnQ2NCx1aW50NjQsYnl0ZVtdKXZvaWQiCgltZXRob2QgImZpbmlzaFVwbG9hZChhZGRyZXNzKXZvaWQiCgl0eG5hIEFwcGxpY2F0aW9uQXJncyAwCgltYXRjaCBhYmlfcm91dGVfc3RhcnRVcGxvYWQgYWJpX3JvdXRlX3VwbG9hZCBhYmlfcm91dGVfZmluaXNoVXBsb2FkCgllcnI=",
     "clear": "I3ByYWdtYSB2ZXJzaW9uIDkKaW50IDE="
   },
   "contract": {
@@ -86,9 +86,9 @@ export const APP_SPEC: AppSpec = {
         "name": "startUpload",
         "args": [
           {
-            "name": "dataIdentifier",
-            "type": "string",
-            "desc": "The unique identifier for the data"
+            "name": "address",
+            "type": "address",
+            "desc": "The address of the DID"
           },
           {
             "name": "numBoxes",
@@ -116,9 +116,9 @@ export const APP_SPEC: AppSpec = {
         "name": "upload",
         "args": [
           {
-            "name": "dataIdentifier",
-            "type": "string",
-            "desc": "The unique identifier for the data"
+            "name": "address",
+            "type": "address",
+            "desc": "The address of the DID"
           },
           {
             "name": "boxIndex",
@@ -143,20 +143,15 @@ export const APP_SPEC: AppSpec = {
         }
       },
       {
-        "name": "setStatus",
+        "name": "finishUpload",
         "args": [
           {
-            "name": "dataIdentifier",
-            "type": "string",
-            "desc": "The unique identifier for the data"
-          },
-          {
-            "name": "status",
-            "type": "uint8",
-            "desc": "The new status for the data"
+            "name": "address",
+            "type": "address",
+            "desc": "The address of the DID"
           }
         ],
-        "desc": "Set the status of the data",
+        "desc": "Mark uploading as false",
         "returns": {
           "type": "void",
           "desc": ""
@@ -221,12 +216,12 @@ export type AlgoDid = {
    * Maps method signatures / names to their argument and return types.
    */
   methods:
-    & Record<'startUpload(string,uint64,uint64,pay)void' | 'startUpload', {
+    & Record<'startUpload(address,uint64,uint64,pay)void' | 'startUpload', {
       argsObj: {
         /**
-         * The unique identifier for the data
+         * The address of the DID
          */
-        dataIdentifier: string
+        address: string
         /**
          * The number of boxes that the data will take up
          */
@@ -240,15 +235,15 @@ export type AlgoDid = {
          */
         mbrPayment: TransactionToSign | Transaction | Promise<SendTransactionResult>
       }
-      argsTuple: [dataIdentifier: string, numBoxes: bigint | number, endBoxSize: bigint | number, mbrPayment: TransactionToSign | Transaction | Promise<SendTransactionResult>]
+      argsTuple: [address: string, numBoxes: bigint | number, endBoxSize: bigint | number, mbrPayment: TransactionToSign | Transaction | Promise<SendTransactionResult>]
       returns: void
     }>
-    & Record<'upload(string,uint64,uint64,byte[])void' | 'upload', {
+    & Record<'upload(address,uint64,uint64,byte[])void' | 'upload', {
       argsObj: {
         /**
-         * The unique identifier for the data
+         * The address of the DID
          */
-        dataIdentifier: string
+        address: string
         /**
          * The index of the box to upload the given chunk of data to
          */
@@ -262,21 +257,17 @@ export type AlgoDid = {
          */
         data: Uint8Array
       }
-      argsTuple: [dataIdentifier: string, boxIndex: bigint | number, offset: bigint | number, data: Uint8Array]
+      argsTuple: [address: string, boxIndex: bigint | number, offset: bigint | number, data: Uint8Array]
       returns: void
     }>
-    & Record<'setStatus(string,uint8)void' | 'setStatus', {
+    & Record<'finishUpload(address)void' | 'finishUpload', {
       argsObj: {
         /**
-         * The unique identifier for the data
+         * The address of the DID
          */
-        dataIdentifier: string
-        /**
-         * The new status for the data
-         */
-        status: number
+        address: string
       }
-      argsTuple: [dataIdentifier: string, status: number]
+      argsTuple: [address: string]
       returns: void
     }>
   /**
@@ -359,7 +350,7 @@ export abstract class AlgoDidCallFactory {
   }
 
   /**
-   * Constructs a no op call for the startUpload(string,uint64,uint64,pay)void ABI method
+   * Constructs a no op call for the startUpload(address,uint64,uint64,pay)void ABI method
    *
    * Allocate boxes to begin data upload process
    *
@@ -367,15 +358,15 @@ export abstract class AlgoDidCallFactory {
    * @param params Any additional parameters for the call
    * @returns A TypedCallParams object for the call
    */
-  static startUpload(args: MethodArgs<'startUpload(string,uint64,uint64,pay)void'>, params: AppClientCallCoreParams & CoreAppCallArgs) {
+  static startUpload(args: MethodArgs<'startUpload(address,uint64,uint64,pay)void'>, params: AppClientCallCoreParams & CoreAppCallArgs) {
     return {
-      method: 'startUpload(string,uint64,uint64,pay)void' as const,
-      methodArgs: Array.isArray(args) ? args : [args.dataIdentifier, args.numBoxes, args.endBoxSize, args.mbrPayment],
+      method: 'startUpload(address,uint64,uint64,pay)void' as const,
+      methodArgs: Array.isArray(args) ? args : [args.address, args.numBoxes, args.endBoxSize, args.mbrPayment],
       ...params,
     }
   }
   /**
-   * Constructs a no op call for the upload(string,uint64,uint64,byte[])void ABI method
+   * Constructs a no op call for the upload(address,uint64,uint64,byte[])void ABI method
    *
    * Upload data to a specific offset in a box
    *
@@ -383,26 +374,26 @@ export abstract class AlgoDidCallFactory {
    * @param params Any additional parameters for the call
    * @returns A TypedCallParams object for the call
    */
-  static upload(args: MethodArgs<'upload(string,uint64,uint64,byte[])void'>, params: AppClientCallCoreParams & CoreAppCallArgs) {
+  static upload(args: MethodArgs<'upload(address,uint64,uint64,byte[])void'>, params: AppClientCallCoreParams & CoreAppCallArgs) {
     return {
-      method: 'upload(string,uint64,uint64,byte[])void' as const,
-      methodArgs: Array.isArray(args) ? args : [args.dataIdentifier, args.boxIndex, args.offset, args.data],
+      method: 'upload(address,uint64,uint64,byte[])void' as const,
+      methodArgs: Array.isArray(args) ? args : [args.address, args.boxIndex, args.offset, args.data],
       ...params,
     }
   }
   /**
-   * Constructs a no op call for the setStatus(string,uint8)void ABI method
+   * Constructs a no op call for the finishUpload(address)void ABI method
    *
-   * Set the status of the data
+   * Mark uploading as false
    *
    * @param args Any args for the contract call
    * @param params Any additional parameters for the call
    * @returns A TypedCallParams object for the call
    */
-  static setStatus(args: MethodArgs<'setStatus(string,uint8)void'>, params: AppClientCallCoreParams & CoreAppCallArgs) {
+  static finishUpload(args: MethodArgs<'finishUpload(address)void'>, params: AppClientCallCoreParams & CoreAppCallArgs) {
     return {
-      method: 'setStatus(string,uint8)void' as const,
-      methodArgs: Array.isArray(args) ? args : [args.dataIdentifier, args.status],
+      method: 'finishUpload(address)void' as const,
+      methodArgs: Array.isArray(args) ? args : [args.address],
       ...params,
     }
   }
@@ -505,7 +496,7 @@ export class AlgoDidClient {
   }
 
   /**
-   * Calls the startUpload(string,uint64,uint64,pay)void ABI method.
+   * Calls the startUpload(address,uint64,uint64,pay)void ABI method.
    *
    * Allocate boxes to begin data upload process
    *
@@ -513,12 +504,12 @@ export class AlgoDidClient {
    * @param params Any additional parameters for the call
    * @returns The result of the call
    */
-  public startUpload(args: MethodArgs<'startUpload(string,uint64,uint64,pay)void'>, params: AppClientCallCoreParams & CoreAppCallArgs = {}) {
+  public startUpload(args: MethodArgs<'startUpload(address,uint64,uint64,pay)void'>, params: AppClientCallCoreParams & CoreAppCallArgs = {}) {
     return this.call(AlgoDidCallFactory.startUpload(args, params))
   }
 
   /**
-   * Calls the upload(string,uint64,uint64,byte[])void ABI method.
+   * Calls the upload(address,uint64,uint64,byte[])void ABI method.
    *
    * Upload data to a specific offset in a box
    *
@@ -526,21 +517,21 @@ export class AlgoDidClient {
    * @param params Any additional parameters for the call
    * @returns The result of the call
    */
-  public upload(args: MethodArgs<'upload(string,uint64,uint64,byte[])void'>, params: AppClientCallCoreParams & CoreAppCallArgs = {}) {
+  public upload(args: MethodArgs<'upload(address,uint64,uint64,byte[])void'>, params: AppClientCallCoreParams & CoreAppCallArgs = {}) {
     return this.call(AlgoDidCallFactory.upload(args, params))
   }
 
   /**
-   * Calls the setStatus(string,uint8)void ABI method.
+   * Calls the finishUpload(address)void ABI method.
    *
-   * Set the status of the data
+   * Mark uploading as false
    *
    * @param args The arguments for the contract call
    * @param params Any additional parameters for the call
    * @returns The result of the call
    */
-  public setStatus(args: MethodArgs<'setStatus(string,uint8)void'>, params: AppClientCallCoreParams & CoreAppCallArgs = {}) {
-    return this.call(AlgoDidCallFactory.setStatus(args, params))
+  public finishUpload(args: MethodArgs<'finishUpload(address)void'>, params: AppClientCallCoreParams & CoreAppCallArgs = {}) {
+    return this.call(AlgoDidCallFactory.finishUpload(args, params))
   }
 
   /**
@@ -605,18 +596,18 @@ export class AlgoDidClient {
     let promiseChain:Promise<unknown> = Promise.resolve()
     const resultMappers: Array<undefined | ((x: any) => any)> = []
     return {
-      startUpload(args: MethodArgs<'startUpload(string,uint64,uint64,pay)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs) {
+      startUpload(args: MethodArgs<'startUpload(address,uint64,uint64,pay)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs) {
         promiseChain = promiseChain.then(() => client.startUpload(args, {...params, sendParams: {...params?.sendParams, skipSending: true, atc}}))
         resultMappers.push(undefined)
         return this
       },
-      upload(args: MethodArgs<'upload(string,uint64,uint64,byte[])void'>, params?: AppClientCallCoreParams & CoreAppCallArgs) {
+      upload(args: MethodArgs<'upload(address,uint64,uint64,byte[])void'>, params?: AppClientCallCoreParams & CoreAppCallArgs) {
         promiseChain = promiseChain.then(() => client.upload(args, {...params, sendParams: {...params?.sendParams, skipSending: true, atc}}))
         resultMappers.push(undefined)
         return this
       },
-      setStatus(args: MethodArgs<'setStatus(string,uint8)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs) {
-        promiseChain = promiseChain.then(() => client.setStatus(args, {...params, sendParams: {...params?.sendParams, skipSending: true, atc}}))
+      finishUpload(args: MethodArgs<'finishUpload(address)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs) {
+        promiseChain = promiseChain.then(() => client.finishUpload(args, {...params, sendParams: {...params?.sendParams, skipSending: true, atc}}))
         resultMappers.push(undefined)
         return this
       },
@@ -646,7 +637,7 @@ export class AlgoDidClient {
 }
 export type AlgoDidComposer<TReturns extends [...any[]] = []> = {
   /**
-   * Calls the startUpload(string,uint64,uint64,pay)void ABI method.
+   * Calls the startUpload(address,uint64,uint64,pay)void ABI method.
    *
    * Allocate boxes to begin data upload process
    *
@@ -654,10 +645,10 @@ export type AlgoDidComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  startUpload(args: MethodArgs<'startUpload(string,uint64,uint64,pay)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs): AlgoDidComposer<[...TReturns, MethodReturn<'startUpload(string,uint64,uint64,pay)void'>]>
+  startUpload(args: MethodArgs<'startUpload(address,uint64,uint64,pay)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs): AlgoDidComposer<[...TReturns, MethodReturn<'startUpload(address,uint64,uint64,pay)void'>]>
 
   /**
-   * Calls the upload(string,uint64,uint64,byte[])void ABI method.
+   * Calls the upload(address,uint64,uint64,byte[])void ABI method.
    *
    * Upload data to a specific offset in a box
    *
@@ -665,18 +656,18 @@ export type AlgoDidComposer<TReturns extends [...any[]] = []> = {
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  upload(args: MethodArgs<'upload(string,uint64,uint64,byte[])void'>, params?: AppClientCallCoreParams & CoreAppCallArgs): AlgoDidComposer<[...TReturns, MethodReturn<'upload(string,uint64,uint64,byte[])void'>]>
+  upload(args: MethodArgs<'upload(address,uint64,uint64,byte[])void'>, params?: AppClientCallCoreParams & CoreAppCallArgs): AlgoDidComposer<[...TReturns, MethodReturn<'upload(address,uint64,uint64,byte[])void'>]>
 
   /**
-   * Calls the setStatus(string,uint8)void ABI method.
+   * Calls the finishUpload(address)void ABI method.
    *
-   * Set the status of the data
+   * Mark uploading as false
    *
    * @param args The arguments for the contract call
    * @param params Any additional parameters for the call
    * @returns The typed transaction composer so you can fluently chain multiple calls or call execute to execute all queued up transactions
    */
-  setStatus(args: MethodArgs<'setStatus(string,uint8)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs): AlgoDidComposer<[...TReturns, MethodReturn<'setStatus(string,uint8)void'>]>
+  finishUpload(args: MethodArgs<'finishUpload(address)void'>, params?: AppClientCallCoreParams & CoreAppCallArgs): AlgoDidComposer<[...TReturns, MethodReturn<'finishUpload(address)void'>]>
 
   /**
    * Makes a clear_state call to an existing instance of the AlgoDID smart contract.

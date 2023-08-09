@@ -4,14 +4,10 @@ import { Contract } from '@algorandfoundation/tealscript';
 /*
 start - The index of the box at which the data starts
 end - The index of the box at which the data ends
-status - 0: in progress, 1: ready, 2: immutable
+uploading - true if the data is still being uploaded
 endSize - The size of the last box
 */
-type Metadata = {start: uint64, end: uint64, status: uint<8>, endSize: uint64};
-
-const IN_PROGRESS = 0 as uint<8>;
-const READY = 1 as uint<8>;
-const IMMUTABLE = 2 as uint<8>;
+type Metadata = {start: uint64, end: uint64, uploading: uint<8>, endSize: uint64};
 
 const COST_PER_BYTE = 400;
 const COST_PER_BOX = 2500;
@@ -22,9 +18,8 @@ class AlgoDID extends Contract {
   // The boxes that contain the data, indexed by uint64
   dataBoxes = new BoxMap<uint64, bytes>();
 
-  // Metadata for a given data identifier
-  // The data identifier can be any string up to 64 bytes
-  metadata = new BoxMap<bytes, Metadata>();
+  // Metadata for a given address
+  metadata = new BoxMap<Address, Metadata>();
 
   // The index of the next box to be created
   currentIndex = new GlobalStateKey<uint64>();
@@ -33,13 +28,13 @@ class AlgoDID extends Contract {
    *
    * Allocate boxes to begin data upload process
    *
-   * @param dataIdentifier The unique identifier for the data
+   * @param address The address of the DID
    * @param numBoxes The number of boxes that the data will take up
    * @param endBoxSize The size of the last box
    * @param mbrPayment Payment from the uploader to cover the box MBR
    */
   startUpload(
-    dataIdentifier: string,
+    address: Address,
     numBoxes: uint64,
     endBoxSize: uint64,
     mbrPayment: PayTxn,
@@ -48,12 +43,12 @@ class AlgoDID extends Contract {
     const endBox = startBox + numBoxes - 1;
 
     const metadata: Metadata = {
-      start: startBox, end: endBox, status: IN_PROGRESS, endSize: endBoxSize,
+      start: startBox, end: endBox, uploading: 1, endSize: endBoxSize,
     };
 
-    assert(!this.metadata.exists(dataIdentifier));
+    assert(!this.metadata.exists(address));
 
-    this.metadata.set(dataIdentifier, metadata);
+    this.metadata.set(address, metadata);
 
     this.currentIndex.set(endBox + 1);
 
@@ -70,14 +65,14 @@ class AlgoDID extends Contract {
    *
    * Upload data to a specific offset in a box
    *
-   * @param dataIdentifier The unique identifier for the data
+   * @param address The address of the DID
    * @param boxIndex The index of the box to upload the given chunk of data to
    * @param offset The offset within the box to start writing the data
    * @param data The data to write
    */
-  upload(dataIdentifier: string, boxIndex: uint64, offset: uint64, data: bytes): void {
-    const metadata = this.metadata.get(dataIdentifier);
-    assert(metadata.status === IN_PROGRESS);
+  upload(address: Address, boxIndex: uint64, offset: uint64, data: bytes): void {
+    const metadata = this.metadata.get(address);
+    assert(metadata.uploading === <uint<8>>1);
     assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
 
     if (offset === 0) {
@@ -89,17 +84,11 @@ class AlgoDID extends Contract {
 
   /**
    *
-   * Set the status of the data
+   * Mark uploading as false
    *
-   * @param dataIdentifier The unique identifier for the data
-   * @param status The new status for the data
+   * @param address The address of the DID
    */
-  setStatus(dataIdentifier: string, status: uint<8>): void {
-    const currentStatus = this.metadata.get(dataIdentifier).status;
-
-    assert(status === READY || status === IMMUTABLE || status === IN_PROGRESS);
-    assert(currentStatus !== IMMUTABLE);
-
-    this.metadata.get(dataIdentifier).status = status;
+  finishUpload(address: Address): void {
+    this.metadata.get(address).uploading = 0;
   }
 }

@@ -23,7 +23,6 @@ abi_route_startUpload:
 	txna ApplicationArgs 2
 	btoi
 	txna ApplicationArgs 1
-	extract 2 0
 	callsub startUpload
 	int 1
 	return
@@ -31,13 +30,13 @@ abi_route_startUpload:
 startUpload:
 	proto 8 0
 
-	// contracts/algo-did.algo.ts:47
+	// contracts/algo-did.algo.ts:42
 	// startBox = this.currentIndex.get()
 	byte "currentIndex"
 	app_global_get
 	frame_bury -5 // startBox: uint64
 
-	// contracts/algo-did.algo.ts:48
+	// contracts/algo-did.algo.ts:43
 	// endBox = startBox + numBoxes - 1
 	frame_dig -5 // startBox: uint64
 	frame_dig -2 // numBoxes: uint64
@@ -46,7 +45,7 @@ startUpload:
 	-
 	frame_bury -6 // endBox: uint64
 
-	// contracts/algo-did.algo.ts:50
+	// contracts/algo-did.algo.ts:45
 	// metadata: Metadata = {
 	frame_dig -5 // startBox: uint64
 	itob
@@ -75,18 +74,7 @@ startUpload:
 	int 8
 	extract3
 	concat
-	byte 0x00
-	byte 0xFF
-	b&
-	dupn 2
-	byte 0xFF
-	b<=
-	assert
-	len
-	int 1
-	-
-	int 1
-	extract3
+	byte 0x01
 	concat
 	frame_dig -3 // endBoxSize: uint64
 	itob
@@ -104,22 +92,22 @@ startUpload:
 	concat
 	frame_bury -7 // metadata: Metadata
 
-	// contracts/algo-did.algo.ts:54
-	// assert(!this.metadata.exists(dataIdentifier))
-	frame_dig -1 // dataIdentifier: bytes
+	// contracts/algo-did.algo.ts:49
+	// assert(!this.metadata.exists(address))
+	frame_dig -1 // address: address
 	box_len
 	swap
 	pop
 	!
 	assert
 
-	// contracts/algo-did.algo.ts:56
-	// this.metadata.set(dataIdentifier, metadata)
-	frame_dig -1 // dataIdentifier: bytes
+	// contracts/algo-did.algo.ts:51
+	// this.metadata.set(address, metadata)
+	frame_dig -1 // address: address
 	frame_dig -7 // metadata: Metadata
 	box_put
 
-	// contracts/algo-did.algo.ts:58
+	// contracts/algo-did.algo.ts:53
 	// this.currentIndex.set(endBox + 1)
 	byte "currentIndex"
 	frame_dig -6 // endBox: uint64
@@ -127,7 +115,7 @@ startUpload:
 	+
 	app_global_put
 
-	// contracts/algo-did.algo.ts:60
+	// contracts/algo-did.algo.ts:55
 	// totalCost = numBoxes * COST_PER_BOX // cost of boxes
 	frame_dig -2 // numBoxes: uint64
 	int 2500
@@ -152,7 +140,7 @@ startUpload:
 	+
 	frame_bury -8 // totalCost: uint64
 
-	// contracts/algo-did.algo.ts:65
+	// contracts/algo-did.algo.ts:60
 	// assert(mbrPayment.amount === totalCost)
 	frame_dig -4 // mbrPayment: pay
 	gtxns Amount
@@ -160,7 +148,7 @@ startUpload:
 	==
 	assert
 
-	// contracts/algo-did.algo.ts:66
+	// contracts/algo-did.algo.ts:61
 	// assert(mbrPayment.receiver === this.app.address)
 	frame_dig -4 // mbrPayment: pay
 	gtxns Receiver
@@ -180,7 +168,6 @@ abi_route_upload:
 	txna ApplicationArgs 2
 	btoi
 	txna ApplicationArgs 1
-	extract 2 0
 	callsub upload
 	int 1
 	return
@@ -188,13 +175,13 @@ abi_route_upload:
 upload:
 	proto 5 0
 
-	// contracts/algo-did.algo.ts:79
-	// metadata = this.metadata.get(dataIdentifier)
-	frame_dig -1 // dataIdentifier: bytes
+	// contracts/algo-did.algo.ts:74
+	// metadata = this.metadata.get(address)
+	frame_dig -1 // address: address
 	frame_bury -5 // storage key//metadata
 
-	// contracts/algo-did.algo.ts:80
-	// assert(metadata.status === IN_PROGRESS)
+	// contracts/algo-did.algo.ts:75
+	// assert(metadata.uploading === <uint<8>>1)
 	frame_dig -5 // storage key//metadata
 	box_get
 	assert
@@ -206,11 +193,11 @@ upload:
 	swap
 	int 1
 	extract3
-	byte 0x00
+	byte 0x01
 	b==
 	assert
 
-	// contracts/algo-did.algo.ts:81
+	// contracts/algo-did.algo.ts:76
 	// assert(metadata.start <= boxIndex && boxIndex <= metadata.end)
 	frame_dig -5 // storage key//metadata
 	box_get
@@ -248,7 +235,7 @@ skip_and0:
 	assert
 
 	// if0_condition
-	// contracts/algo-did.algo.ts:83
+	// contracts/algo-did.algo.ts:78
 	// offset === 0
 	frame_dig -3 // offset: uint64
 	int 0
@@ -256,7 +243,7 @@ skip_and0:
 	bz if0_end
 
 	// if0_consequent
-	// contracts/algo-did.algo.ts:84
+	// contracts/algo-did.algo.ts:79
 	// this.dataBoxes.create(boxIndex, boxIndex === metadata.end ? metadata.endSize : MAX_BOX_SIZE)
 	frame_dig -2 // boxIndex: uint64
 	itob
@@ -296,7 +283,7 @@ ternary0_end:
 	box_create
 
 if0_end:
-	// contracts/algo-did.algo.ts:87
+	// contracts/algo-did.algo.ts:82
 	// this.dataBoxes.replace(boxIndex, offset, data)
 	frame_dig -2 // boxIndex: uint64
 	itob
@@ -305,24 +292,19 @@ if0_end:
 	box_replace
 	retsub
 
-abi_route_setStatus:
-	byte 0x
-	txna ApplicationArgs 2
+abi_route_finishUpload:
+	// no dupn needed
 	txna ApplicationArgs 1
-	extract 2 0
-	callsub setStatus
+	callsub finishUpload
 	int 1
 	return
 
-setStatus:
-	proto 3 0
+finishUpload:
+	proto 1 0
 
-	// contracts/algo-did.algo.ts:98
-	// currentStatus = this.metadata.get(dataIdentifier).status
-	frame_dig -1 // dataIdentifier: bytes
-	box_get
-	assert
-	frame_dig -1 // dataIdentifier: bytes
+	// contracts/algo-did.algo.ts:92
+	// this.metadata.get(address).uploading = 0
+	frame_dig -1 // address: address
 	box_get
 	assert
 	store 0 // full array
@@ -331,54 +313,10 @@ setStatus:
 	+
 	load 0 // full array
 	swap
-	int 1
-	extract3
-	frame_bury -3 // currentStatus: uint8
-
-	// contracts/algo-did.algo.ts:100
-	// assert(status === READY || status === IMMUTABLE || status === IN_PROGRESS)
-	frame_dig -2 // status: uint8
-	byte 0x01
-	b==
-	dup
-	bnz skip_or0
-	frame_dig -2 // status: uint8
-	byte 0x02
-	b==
-	||
-
-skip_or0:
-	dup
-	bnz skip_or1
-	frame_dig -2 // status: uint8
-	byte 0x00
-	b==
-	||
-
-skip_or1:
-	assert
-
-	// contracts/algo-did.algo.ts:101
-	// assert(currentStatus !== IMMUTABLE)
-	frame_dig -3 // currentStatus: uint8
-	byte 0x02
-	b!=
-	assert
-
-	// contracts/algo-did.algo.ts:103
-	// this.metadata.get(dataIdentifier).status = status
-	frame_dig -1 // dataIdentifier: bytes
-	box_get
-	assert
-	store 0 // full array
-	int 0 // initial offset
-	int 16 // headOffset
-	+
-	load 0 // full array
-	swap
-	frame_dig -2 // status: uint8
+	int 0
+	itob
 	replace3
-	frame_dig -1 // dataIdentifier: bytes
+	frame_dig -1 // address: address
 	swap
 	box_put
 	retsub
@@ -393,9 +331,9 @@ create_NoOp:
 	err
 
 call_NoOp:
-	method "startUpload(string,uint64,uint64,pay)void"
-	method "upload(string,uint64,uint64,byte[])void"
-	method "setStatus(string,uint8)void"
+	method "startUpload(address,uint64,uint64,pay)void"
+	method "upload(address,uint64,uint64,byte[])void"
+	method "finishUpload(address)void"
 	txna ApplicationArgs 0
-	match abi_route_startUpload abi_route_upload abi_route_setStatus
+	match abi_route_startUpload abi_route_upload abi_route_finishUpload
 	err

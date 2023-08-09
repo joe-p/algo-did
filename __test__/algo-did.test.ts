@@ -17,7 +17,7 @@ const BYTES_PER_CALL = 2048
 - 64 // 64 bytes for the name
 - 8 // 8 bytes for the box index
 - 8; // 8 bytes for the offset
-type DataInfo = {start: BigInt, end: BigInt, status: BigInt, endSize: BigInt};
+type DataInfo = {start: BigInt, end: BigInt, uploading: BigInt, endSize: BigInt};
 
 describe('Big Box', () => {
   let data: Buffer;
@@ -55,11 +55,11 @@ describe('Big Box', () => {
       suggestedParams: await algodClient.getTransactionParams().do(),
     });
 
-    const dataName = new Uint8Array(Buffer.from('TEAL.pdf'));
+    const dataName = algosdk.decodeAddress(sender.addr).publicKey;
 
     await appClient.call({
       method: 'startUpload',
-      methodArgs: ['TEAL.pdf', numBoxes, endBoxSize, mbrPayment],
+      methodArgs: [sender.addr, numBoxes, endBoxSize, mbrPayment],
       boxes: [
         dataName,
       ],
@@ -70,13 +70,13 @@ describe('Big Box', () => {
     const dataInfo: DataInfo = {
       start: res[0] as BigInt,
       end: res[1] as BigInt,
-      status: res[2] as BigInt,
+      uploading: res[2] as BigInt,
       endSize: res[3] as BigInt,
     };
 
     expect(dataInfo.start).toBe(0n);
     expect(dataInfo.end).toBe(BigInt(numBoxes - 1));
-    expect(dataInfo.status).toBe(0n);
+    expect(dataInfo.uploading).toBe(1n);
     expect(dataInfo.endSize).toBe(BigInt(endBoxSize));
   });
 
@@ -106,7 +106,7 @@ describe('Big Box', () => {
       const boxRef = { appIndex: 0, name: algosdk.encodeUint64(boxIndex) };
       const boxes: algosdk.BoxReference[] = new Array(7).fill(boxRef);
 
-      boxes.push({ appIndex: 0, name: new Uint8Array(Buffer.from('TEAL.pdf')) });
+      boxes.push({ appIndex: 0, name: algosdk.decodeAddress(sender.addr).publicKey });
 
       const firstGroup = chunks.slice(0, 8);
       const secondGroup = chunks.slice(8);
@@ -115,7 +115,7 @@ describe('Big Box', () => {
       firstGroup.forEach((chunk, i) => {
         firstAtc.addMethodCall({
           method: appClient.getABIMethod('upload')!,
-          methodArgs: [Buffer.from('TEAL.pdf'), boxIndex, BYTES_PER_CALL * i, chunk],
+          methodArgs: [sender.addr, boxIndex, BYTES_PER_CALL * i, chunk],
           boxes,
           suggestedParams,
           sender: sender.addr,
@@ -132,7 +132,7 @@ describe('Big Box', () => {
       secondGroup.forEach((chunk, i) => {
         secondAtc.addMethodCall({
           method: appClient.getABIMethod('upload')!,
-          methodArgs: [Buffer.from('TEAL.pdf'), boxIndex, BYTES_PER_CALL * (i + 8), chunk],
+          methodArgs: [sender.addr, boxIndex, BYTES_PER_CALL * (i + 8), chunk],
           boxes,
           suggestedParams,
           sender: sender.addr,
