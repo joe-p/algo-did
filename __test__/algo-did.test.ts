@@ -11,6 +11,7 @@ import appSpec from '../contracts/artifacts/AlgoDID.json';
 
 const COST_PER_BYTE = 400;
 const COST_PER_BOX = 2500;
+const MAX_BOX_SIZE = 32768;
 
 const BYTES_PER_CALL = 2048
 - 4 // 4 bytes for the method selector
@@ -36,15 +37,15 @@ async function uploadDIDDocument(
     app: JSON.stringify(appSpec),
   }, algodClient);
 
-  const numBoxes = Math.floor(data.byteLength / 32768);
+  const numBoxes = Math.floor(data.byteLength / MAX_BOX_SIZE);
   const boxData: Buffer[] = [];
 
   for (let i = 0; i < numBoxes; i++) {
-    const box = data.subarray(i * 32768, (i + 1) * 32768);
+    const box = data.subarray(i * MAX_BOX_SIZE, (i + 1) * MAX_BOX_SIZE);
     boxData.push(box);
   }
 
-  boxData.push(data.subarray(numBoxes * 32768, data.byteLength));
+  boxData.push(data.subarray(numBoxes * MAX_BOX_SIZE, data.byteLength));
 
   const suggestedParams = await algodClient.getTransactionParams().do();
 
@@ -132,12 +133,12 @@ describe('Big Box', () => {
   });
 
   test('startUpload', async () => {
-    const numBoxes = Math.ceil(data.byteLength / 32768);
+    const numBoxes = Math.ceil(data.byteLength / MAX_BOX_SIZE);
 
-    const endBoxSize = data.byteLength % 32768;
+    const endBoxSize = data.byteLength % MAX_BOX_SIZE;
 
     const totalCost = numBoxes * COST_PER_BOX
-    + (numBoxes - 1) * 32768 * COST_PER_BYTE
+    + (numBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE
     + numBoxes * 64 * COST_PER_BYTE
     + endBoxSize * COST_PER_BYTE;
 
