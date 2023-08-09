@@ -3,7 +3,7 @@ import * as algokit from '@algorandfoundation/algokit-utils';
 import fs from 'fs';
 import { ApplicationClient } from '@algorandfoundation/algokit-utils/types/app-client';
 import {
-  describe, test, expect, beforeAll, beforeEach,
+  describe, test, expect, beforeAll,
 } from '@jest/globals';
 import algosdk from 'algosdk';
 import { algodClient, kmdClient } from './common';
@@ -18,11 +18,58 @@ const BYTES_PER_CALL = 2048
 - 64 // 64 bytes for the name
 - 8 // 8 bytes for the box index
 - 8; // 8 bytes for the offset
-type DataInfo = {start: BigInt, end: BigInt, uploading: BigInt, endSize: BigInt};
+type Metadata = {start: bigint, end: bigint, uploading: bigint, endSize: bigint};
 
 // pubkey encoding for now use Algorand base32 address
 // did = did:algo:<pubKey>-<providerAppId>
-// async function resolveDID(did: string) {}
+async function resolveDID(did: string): Promise<Buffer> {
+  const splitDid = did.split(':');
+
+  if (splitDid[0] !== 'did') throw new Error(`Invalid protocol. Expected 'did', got ${splitDid[0]}`);
+  if (splitDid[1] !== 'algo') throw new Error(`Invalid DID method. Expected 'algod', got ${splitDid[1]}`);
+
+  const splitID = splitDid[2].split('-');
+
+  let pubKey: Uint8Array;
+  try {
+    pubKey = algosdk.decodeAddress(splitID[0]).publicKey;
+  } catch (e) {
+    throw new Error(`Invalid public key. Expected Algorand address, got ${splitID[0]}`);
+  }
+
+  let appID: bigint;
+
+  try {
+    appID = BigInt(splitID[1]);
+    algosdk.encodeUint64(appID);
+  } catch (e) {
+    throw new Error(`Invalid app ID. Expected uint64, got ${splitID[1]}`);
+  }
+
+  const appClient = new ApplicationClient({
+    resolveBy: 'id',
+    id: appID,
+    sender: algosdk.generateAccount(),
+    app: JSON.stringify(appSpec),
+  }, algodClient);
+
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
+
+  const metadata: Metadata = {
+    start: boxValue[0], end: boxValue[1], uploading: boxValue[2], endSize: boxValue[3],
+  };
+
+  if (metadata.uploading) throw new Error('DID document is still being uploaded');
+
+  const boxPromises = [];
+  for (let i = metadata.start; i <= metadata.end; i += 1n) {
+    boxPromises.push(appClient.getBoxValue(algosdk.encodeUint64(i)));
+  }
+
+  const boxValues = await Promise.all(boxPromises);
+
+  return Buffer.concat(boxValues);
+}
 
 async function uploadDIDDocument(
   data: Buffer,
@@ -36,6 +83,31 @@ async function uploadDIDDocument(
     sender,
     app: JSON.stringify(appSpec),
   }, algodClient);
+
+  const ceilBoxes = Math.ceil(data.byteLength / MAX_BOX_SIZE);
+
+  const endBoxSize = data.byteLength % MAX_BOX_SIZE;
+
+  const totalCost = ceilBoxes * COST_PER_BOX
+    + (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE
+    + ceilBoxes * 64 * COST_PER_BYTE
+    + endBoxSize * COST_PER_BYTE;
+
+  const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: sender.addr,
+    to: (await appClient.getAppReference()).appAddress,
+    amount: totalCost,
+    suggestedParams: await algodClient.getTransactionParams().do(),
+  });
+
+  await appClient.call({
+    method: 'startUpload',
+    methodArgs: [pubKey, ceilBoxes, endBoxSize, mbrPayment],
+    boxes: [
+      pubKey,
+    ],
+    sendParams: { suppressLog: true },
+  });
 
   const numBoxes = Math.floor(data.byteLength / MAX_BOX_SIZE);
   const boxData: Buffer[] = [];
@@ -113,7 +185,7 @@ async function uploadDIDDocument(
   return boxData;
 }
 
-describe('Big Box', () => {
+describe('Algorand DID', () => {
   let data: Buffer;
   let appClient: ApplicationClient;
   let sender: algosdk.Account;
@@ -132,50 +204,9 @@ describe('Big Box', () => {
     await appClient.create({ sendParams: { suppressLog: true } });
   });
 
-  test('startUpload', async () => {
-    const numBoxes = Math.ceil(data.byteLength / MAX_BOX_SIZE);
-
-    const endBoxSize = data.byteLength % MAX_BOX_SIZE;
-
-    const totalCost = numBoxes * COST_PER_BOX
-    + (numBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE
-    + numBoxes * 64 * COST_PER_BYTE
-    + endBoxSize * COST_PER_BYTE;
-
-    const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-      from: sender.addr,
-      to: (await appClient.getAppReference()).appAddress,
-      amount: totalCost,
-      suggestedParams: await algodClient.getTransactionParams().do(),
-    });
-
-    const pubKey = algosdk.decodeAddress(sender.addr).publicKey;
-
-    await appClient.call({
-      method: 'startUpload',
-      methodArgs: [pubKey, numBoxes, endBoxSize, mbrPayment],
-      boxes: [
-        pubKey,
-      ],
-      sendParams: { suppressLog: true },
-    });
-
-    const res = await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)')) as BigInt[];
-    const dataInfo: DataInfo = {
-      start: res[0] as BigInt,
-      end: res[1] as BigInt,
-      uploading: res[2] as BigInt,
-      endSize: res[3] as BigInt,
-    };
-
-    expect(dataInfo.start).toBe(0n);
-    expect(dataInfo.end).toBe(BigInt(numBoxes - 1));
-    expect(dataInfo.uploading).toBe(1n);
-    expect(dataInfo.endSize).toBe(BigInt(endBoxSize));
-  });
-
-  test('upload', async () => {
+  test('uploadDIDDocument', async () => {
     const { appId } = await appClient.getAppReference();
+
     const boxData = await uploadDIDDocument(
       data,
       Number(appId),
@@ -193,5 +224,13 @@ describe('Big Box', () => {
     });
 
     expect(Buffer.concat(boxValues).toString('hex')).toEqual(data.toString('hex'));
+  });
+
+  test('resolveDID', async () => {
+    const { appId } = await appClient.getAppReference();
+
+    const resolvedData = await resolveDID(`did:algo:${sender.addr}-${appId}`);
+
+    expect(resolvedData.toString('hex')).toEqual(data.toString('hex'));
   });
 });
