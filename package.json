@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "generate-client": "algokitgen generate -a contracts/artifacts/AlgoDid.json -o contracts/clients/AlgoDidClient.ts",
+    "generate-client": "algokitgen generate -a contracts/artifacts/AlgoDID.json -o contracts/clients/AlgoDIDClient.ts",
     "compile-contract": "tealscript contracts/algo-did.algo.ts contracts/artifacts",
     "build": "npm run compile-contract && npm run generate-client",
     "test": "npm run build && jest",
