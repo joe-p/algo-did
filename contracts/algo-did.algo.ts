@@ -18,7 +18,7 @@ class AlgoDID extends Contract {
   // The boxes that contain the data, indexed by uint64
   dataBoxes = new BoxMap<uint64, bytes>();
 
-  // Metadata for a given address
+  // Metadata for a given pubkey
   metadata = new BoxMap<Address, Metadata>();
 
   // The index of the next box to be created
@@ -28,17 +28,19 @@ class AlgoDID extends Contract {
    *
    * Allocate boxes to begin data upload process
    *
-   * @param address The address of the DID
+   * @param pubKey The pubkey of the DID
    * @param numBoxes The number of boxes that the data will take up
    * @param endBoxSize The size of the last box
    * @param mbrPayment Payment from the uploader to cover the box MBR
    */
   startUpload(
-    address: Address,
+    pubKey: Address,
     numBoxes: uint64,
     endBoxSize: uint64,
     mbrPayment: PayTxn,
   ): void {
+    assert(this.txn.sender === this.app.creator);
+
     const startBox = this.currentIndex.get();
     const endBox = startBox + numBoxes - 1;
 
@@ -46,9 +48,9 @@ class AlgoDID extends Contract {
       start: startBox, end: endBox, uploading: 1, endSize: endBoxSize,
     };
 
-    assert(!this.metadata.exists(address));
+    assert(!this.metadata.exists(pubKey));
 
-    this.metadata.set(address, metadata);
+    this.metadata.set(pubKey, metadata);
 
     this.currentIndex.set(endBox + 1);
 
@@ -65,13 +67,15 @@ class AlgoDID extends Contract {
    *
    * Upload data to a specific offset in a box
    *
-   * @param address The address of the DID
+   * @param pubKey The pubkey of the DID
    * @param boxIndex The index of the box to upload the given chunk of data to
    * @param offset The offset within the box to start writing the data
    * @param data The data to write
    */
-  upload(address: Address, boxIndex: uint64, offset: uint64, data: bytes): void {
-    const metadata = this.metadata.get(address);
+  upload(pubKey: Address, boxIndex: uint64, offset: uint64, data: bytes): void {
+    assert(this.txn.sender === this.app.creator);
+
+    const metadata = this.metadata.get(pubKey);
     assert(metadata.uploading === <uint<8>>1);
     assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
 
@@ -86,9 +90,11 @@ class AlgoDID extends Contract {
    *
    * Mark uploading as false
    *
-   * @param address The address of the DID
+   * @param pubKey The address of the DID
    */
-  finishUpload(address: Address): void {
-    this.metadata.get(address).uploading = 0;
+  finishUpload(pubKey: Address): void {
+    assert(this.txn.sender === this.app.creator);
+
+    this.metadata.get(pubKey).uploading = 0;
   }
 }

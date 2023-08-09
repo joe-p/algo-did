@@ -19,10 +19,14 @@ const BYTES_PER_CALL = 2048
 - 8; // 8 bytes for the offset
 type DataInfo = {start: BigInt, end: BigInt, uploading: BigInt, endSize: BigInt};
 
+// pubkey encoding for now use Algorand base32 address
+// did = did:algo:<pubKey>-<providerAppId>
+// async function resolveDID(did: string) {}
+
 async function uploadDIDDocument(
   data: Buffer,
   appID: number,
-  address: string,
+  pubKey: Uint8Array,
   sender: algosdk.Account,
 ): Promise<Buffer[]> {
   const appClient = new ApplicationClient({
@@ -56,7 +60,7 @@ async function uploadDIDDocument(
     const boxRef = { appIndex: 0, name: algosdk.encodeUint64(boxIndex) };
     const boxes: algosdk.BoxReference[] = new Array(7).fill(boxRef);
 
-    boxes.push({ appIndex: 0, name: algosdk.decodeAddress(address).publicKey });
+    boxes.push({ appIndex: 0, name: pubKey });
 
     const firstGroup = chunks.slice(0, 8);
     const secondGroup = chunks.slice(8);
@@ -65,7 +69,7 @@ async function uploadDIDDocument(
     firstGroup.forEach((chunk, i) => {
       firstAtc.addMethodCall({
         method: appClient.getABIMethod('upload')!,
-        methodArgs: [address, boxIndex, BYTES_PER_CALL * i, chunk],
+        methodArgs: [pubKey, boxIndex, BYTES_PER_CALL * i, chunk],
         boxes,
         suggestedParams,
         sender: sender.addr,
@@ -82,7 +86,7 @@ async function uploadDIDDocument(
     secondGroup.forEach((chunk, i) => {
       secondAtc.addMethodCall({
         method: appClient.getABIMethod('upload')!,
-        methodArgs: [address, boxIndex, BYTES_PER_CALL * (i + 8), chunk],
+        methodArgs: [pubKey, boxIndex, BYTES_PER_CALL * (i + 8), chunk],
         boxes,
         suggestedParams,
         sender: sender.addr,
@@ -95,6 +99,15 @@ async function uploadDIDDocument(
   });
 
   await Promise.all(boxPromises);
+
+  await appClient.call({
+    method: 'finishUpload',
+    methodArgs: [pubKey],
+    boxes: [
+      pubKey,
+    ],
+    sendParams: { suppressLog: true },
+  });
 
   return boxData;
 }
@@ -135,18 +148,18 @@ describe('Big Box', () => {
       suggestedParams: await algodClient.getTransactionParams().do(),
     });
 
-    const dataName = algosdk.decodeAddress(sender.addr).publicKey;
+    const pubKey = algosdk.decodeAddress(sender.addr).publicKey;
 
     await appClient.call({
       method: 'startUpload',
-      methodArgs: [sender.addr, numBoxes, endBoxSize, mbrPayment],
+      methodArgs: [pubKey, numBoxes, endBoxSize, mbrPayment],
       boxes: [
-        dataName,
+        pubKey,
       ],
       sendParams: { suppressLog: true },
     });
 
-    const res = await appClient.getBoxValueFromABIType(dataName, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)')) as BigInt[];
+    const res = await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)')) as BigInt[];
     const dataInfo: DataInfo = {
       start: res[0] as BigInt,
       end: res[1] as BigInt,
@@ -162,7 +175,12 @@ describe('Big Box', () => {
 
   test('upload', async () => {
     const { appId } = await appClient.getAppReference();
-    const boxData = await uploadDIDDocument(data, Number(appId), sender.addr, sender);
+    const boxData = await uploadDIDDocument(
+      data,
+      Number(appId),
+      algosdk.decodeAddress(sender.addr).publicKey,
+      sender,
+    );
 
     const boxValuePromises = boxData
       .map(async (_, boxIndex) => appClient.getBoxValue(algosdk.encodeUint64(boxIndex)));
