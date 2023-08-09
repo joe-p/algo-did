@@ -19,6 +19,80 @@ const BYTES_PER_CALL = 2048
 - 8; // 8 bytes for the offset
 type DataInfo = {start: BigInt, end: BigInt, uploading: BigInt, endSize: BigInt};
 
+async function uploadDIDDocument(
+  data: Buffer,
+  appClient: ApplicationClient,
+  address: string,
+  sender: algosdk.Account,
+): Promise<Buffer[]> {
+  const numBoxes = Math.floor(data.byteLength / 32768);
+  const boxData: Buffer[] = [];
+
+  for (let i = 0; i < numBoxes; i++) {
+    const box = data.subarray(i * 32768, (i + 1) * 32768);
+    boxData.push(box);
+  }
+
+  boxData.push(data.subarray(numBoxes * 32768, data.byteLength));
+
+  const suggestedParams = await algodClient.getTransactionParams().do();
+  const appID = Number((await appClient.getAppReference()).appId);
+
+  const boxPromises = boxData.map(async (box, boxIndex) => {
+    const numChunks = Math.ceil(box.byteLength / BYTES_PER_CALL);
+
+    const chunks: Buffer[] = [];
+
+    for (let i = 0; i < numChunks; i++) {
+      chunks.push(box.subarray(i * BYTES_PER_CALL, (i + 1) * BYTES_PER_CALL));
+    }
+
+    const boxRef = { appIndex: 0, name: algosdk.encodeUint64(boxIndex) };
+    const boxes: algosdk.BoxReference[] = new Array(7).fill(boxRef);
+
+    boxes.push({ appIndex: 0, name: algosdk.decodeAddress(address).publicKey });
+
+    const firstGroup = chunks.slice(0, 8);
+    const secondGroup = chunks.slice(8);
+
+    const firstAtc = new algosdk.AtomicTransactionComposer();
+    firstGroup.forEach((chunk, i) => {
+      firstAtc.addMethodCall({
+        method: appClient.getABIMethod('upload')!,
+        methodArgs: [address, boxIndex, BYTES_PER_CALL * i, chunk],
+        boxes,
+        suggestedParams,
+        sender: sender.addr,
+        signer: algosdk.makeBasicAccountTransactionSigner(sender),
+        appID,
+      });
+    });
+
+    await firstAtc.execute(algodClient, 3);
+
+    if (secondGroup.length === 0) return;
+
+    const secondAtc = new algosdk.AtomicTransactionComposer();
+    secondGroup.forEach((chunk, i) => {
+      secondAtc.addMethodCall({
+        method: appClient.getABIMethod('upload')!,
+        methodArgs: [address, boxIndex, BYTES_PER_CALL * (i + 8), chunk],
+        boxes,
+        suggestedParams,
+        sender: sender.addr,
+        signer: algosdk.makeBasicAccountTransactionSigner(sender),
+        appID,
+      });
+    });
+
+    await secondAtc.execute(algodClient, 3);
+  });
+
+  await Promise.all(boxPromises);
+
+  return boxData;
+}
+
 describe('Big Box', () => {
   let data: Buffer;
   let appClient: ApplicationClient;
@@ -81,70 +155,7 @@ describe('Big Box', () => {
   });
 
   test('upload', async () => {
-    const numBoxes = Math.floor(data.byteLength / 32768);
-    const boxData: Buffer[] = [];
-
-    for (let i = 0; i < numBoxes; i++) {
-      const box = data.subarray(i * 32768, (i + 1) * 32768);
-      boxData.push(box);
-    }
-
-    boxData.push(data.subarray(numBoxes * 32768, data.byteLength));
-
-    const suggestedParams = await algodClient.getTransactionParams().do();
-    const appID = Number((await appClient.getAppReference()).appId);
-
-    const boxPromises = boxData.map(async (box, boxIndex) => {
-      const numChunks = Math.ceil(box.byteLength / BYTES_PER_CALL);
-
-      const chunks: Buffer[] = [];
-
-      for (let i = 0; i < numChunks; i++) {
-        chunks.push(box.subarray(i * BYTES_PER_CALL, (i + 1) * BYTES_PER_CALL));
-      }
-
-      const boxRef = { appIndex: 0, name: algosdk.encodeUint64(boxIndex) };
-      const boxes: algosdk.BoxReference[] = new Array(7).fill(boxRef);
-
-      boxes.push({ appIndex: 0, name: algosdk.decodeAddress(sender.addr).publicKey });
-
-      const firstGroup = chunks.slice(0, 8);
-      const secondGroup = chunks.slice(8);
-
-      const firstAtc = new algosdk.AtomicTransactionComposer();
-      firstGroup.forEach((chunk, i) => {
-        firstAtc.addMethodCall({
-          method: appClient.getABIMethod('upload')!,
-          methodArgs: [sender.addr, boxIndex, BYTES_PER_CALL * i, chunk],
-          boxes,
-          suggestedParams,
-          sender: sender.addr,
-          signer: algosdk.makeBasicAccountTransactionSigner(sender),
-          appID,
-        });
-      });
-
-      await firstAtc.execute(algodClient, 3);
-
-      if (secondGroup.length === 0) return;
-
-      const secondAtc = new algosdk.AtomicTransactionComposer();
-      secondGroup.forEach((chunk, i) => {
-        secondAtc.addMethodCall({
-          method: appClient.getABIMethod('upload')!,
-          methodArgs: [sender.addr, boxIndex, BYTES_PER_CALL * (i + 8), chunk],
-          boxes,
-          suggestedParams,
-          sender: sender.addr,
-          signer: algosdk.makeBasicAccountTransactionSigner(sender),
-          appID,
-        });
-      });
-
-      await secondAtc.execute(algodClient, 3);
-    });
-
-    await Promise.all(boxPromises);
+    const boxData = await uploadDIDDocument(data, appClient, sender.addr, sender);
 
     const boxValuePromises = boxData
       .map(async (_, boxIndex) => appClient.getBoxValue(algosdk.encodeUint64(boxIndex)));
