@@ -54,10 +54,11 @@ class AlgoDID extends Contract {
 
     this.currentIndex.set(endBox + 1);
 
-    const totalCost = numBoxes * COST_PER_BOX // cost of boxes
+    const totalCost = numBoxes * COST_PER_BOX // cost of data boxes
     + (numBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
-    + numBoxes * 64 * COST_PER_BYTE // cost of keys
-    + endBoxSize * COST_PER_BYTE; // cost of last box data
+    + numBoxes * 8 * COST_PER_BYTE // cost of data keys
+    + endBoxSize * COST_PER_BYTE // cost of last data box
+    + COST_PER_BOX + (8 + 8 + 1 + 8 + 32) * COST_PER_BYTE; // cost of metadata box
 
     assert(mbrPayment.amount === totalCost);
     assert(mbrPayment.receiver === this.app.address);

@@ -8,7 +8,7 @@ const MAX_BOX_SIZE = 32768;
 
 const BYTES_PER_CALL = 2048
 - 4 // 4 bytes for the method selector
-- 64 // 64 bytes for the name
+- 34 // 34 bytes for the key
 - 8 // 8 bytes for the box index
 - 8; // 8 bytes for the offset
 
@@ -81,10 +81,11 @@ export async function uploadDIDDocument(
 
   const endBoxSize = data.byteLength % MAX_BOX_SIZE;
 
-  const totalCost = ceilBoxes * COST_PER_BOX
-      + (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE
-      + ceilBoxes * 64 * COST_PER_BYTE
-      + endBoxSize * COST_PER_BYTE;
+  const totalCost = ceilBoxes * COST_PER_BOX // cost of data boxes
+  + (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
+  + ceilBoxes * 8 * COST_PER_BYTE // cost of data keys
+  + endBoxSize * COST_PER_BYTE // cost of last data box
+  + COST_PER_BOX + (8 + 8 + 1 + 8 + 32) * COST_PER_BYTE; // cost of metadata box
 
   const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
     from: sender.addr,

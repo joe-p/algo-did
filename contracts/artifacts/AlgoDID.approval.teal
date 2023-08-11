@@ -125,7 +125,7 @@ startUpload:
 	app_global_put
 
 	// contracts/algo-did.algo.ts:57
-	// totalCost = numBoxes * COST_PER_BOX // cost of boxes
+	// totalCost = numBoxes * COST_PER_BOX // cost of data boxes
 	frame_dig -2 // numBoxes: uint64
 	int 2500
 	*
@@ -138,7 +138,7 @@ startUpload:
 	*
 	+
 	frame_dig -2 // numBoxes: uint64
-	int 64
+	int 8
 	*
 	int 400
 	*
@@ -147,9 +147,23 @@ startUpload:
 	int 400
 	*
 	+
+	int 2500
+	+
+	int 8
+	int 8
+	+
+	int 1
+	+
+	int 8
+	+
+	int 32
+	+
+	int 400
+	*
+	+
 	frame_bury -8 // totalCost: uint64
 
-	// contracts/algo-did.algo.ts:62
+	// contracts/algo-did.algo.ts:63
 	// assert(mbrPayment.amount === totalCost)
 	frame_dig -4 // mbrPayment: pay
 	gtxns Amount
@@ -157,7 +171,7 @@ startUpload:
 	==
 	assert
 
-	// contracts/algo-did.algo.ts:63
+	// contracts/algo-did.algo.ts:64
 	// assert(mbrPayment.receiver === this.app.address)
 	frame_dig -4 // mbrPayment: pay
 	gtxns Receiver
@@ -184,7 +198,7 @@ abi_route_upload:
 upload:
 	proto 5 0
 
-	// contracts/algo-did.algo.ts:76
+	// contracts/algo-did.algo.ts:77
 	// assert(this.txn.sender === this.app.creator)
 	txn Sender
 	txna Applications 0
@@ -193,12 +207,12 @@ upload:
 	==
 	assert
 
-	// contracts/algo-did.algo.ts:78
+	// contracts/algo-did.algo.ts:79
 	// metadata = this.metadata.get(pubKey)
 	frame_dig -1 // pubKey: address
 	frame_bury -5 // storage key//metadata
 
-	// contracts/algo-did.algo.ts:79
+	// contracts/algo-did.algo.ts:80
 	// assert(metadata.uploading === <uint<8>>1)
 	frame_dig -5 // storage key//metadata
 	box_get
@@ -215,7 +229,7 @@ upload:
 	b==
 	assert
 
-	// contracts/algo-did.algo.ts:80
+	// contracts/algo-did.algo.ts:81
 	// assert(metadata.start <= boxIndex && boxIndex <= metadata.end)
 	frame_dig -5 // storage key//metadata
 	box_get
@@ -253,7 +267,7 @@ skip_and0:
 	assert
 
 	// if0_condition
-	// contracts/algo-did.algo.ts:82
+	// contracts/algo-did.algo.ts:83
 	// offset === 0
 	frame_dig -3 // offset: uint64
 	int 0
@@ -261,7 +275,7 @@ skip_and0:
 	bz if0_end
 
 	// if0_consequent
-	// contracts/algo-did.algo.ts:83
+	// contracts/algo-did.algo.ts:84
 	// this.dataBoxes.create(boxIndex, boxIndex === metadata.end ? metadata.endSize : MAX_BOX_SIZE)
 	frame_dig -2 // boxIndex: uint64
 	itob
@@ -301,7 +315,7 @@ ternary0_end:
 	box_create
 
 if0_end:
-	// contracts/algo-did.algo.ts:86
+	// contracts/algo-did.algo.ts:87
 	// this.dataBoxes.replace(boxIndex, offset, data)
 	frame_dig -2 // boxIndex: uint64
 	itob
@@ -320,7 +334,7 @@ abi_route_finishUpload:
 finishUpload:
 	proto 1 0
 
-	// contracts/algo-did.algo.ts:96
+	// contracts/algo-did.algo.ts:97
 	// assert(this.txn.sender === this.app.creator)
 	txn Sender
 	txna Applications 0
@@ -329,7 +343,7 @@ finishUpload:
 	==
 	assert
 
-	// contracts/algo-did.algo.ts:98
+	// contracts/algo-did.algo.ts:99
 	// this.metadata.get(pubKey).uploading = 0
 	frame_dig -1 // pubKey: address
 	box_get

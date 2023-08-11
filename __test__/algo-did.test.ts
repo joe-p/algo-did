@@ -29,6 +29,11 @@ describe('Algorand DID', () => {
     }, algodClient);
 
     await appClient.create({ sendParams: { suppressLog: true } });
+
+    await appClient.fundAppAccount({
+      amount: algokit.microAlgos(100_000),
+      sendParams: { suppressLog: true },
+    });
   });
 
   describe('uploadDIDDocument', () => {
