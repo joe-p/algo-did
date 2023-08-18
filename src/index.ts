@@ -63,6 +63,24 @@ export async function resolveDID(did: string, algodClient: algosdk.Algodv2): Pro
   return Buffer.concat(boxValues);
 }
 
+async function tryExecute(
+  atc: algosdk.AtomicTransactionComposer,
+  algodClient: algosdk.Algodv2,
+  retryCount = 1,
+): Promise<void> {
+  if (retryCount > 3) throw Error('Failed to execute transaction group after 3 retries');
+
+  try {
+    await atc.execute(algodClient, 3);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn(`Failed to send transaction group. Retrying in ${500 * retryCount}ms (${retryCount / 3})`);
+
+    await new Promise((r) => { setTimeout(r, 500 * retryCount); });
+    await tryExecute(atc, algodClient, retryCount + 1);
+  }
+}
+
 export async function uploadDIDDocument(
   data: Buffer,
   appID: number,
@@ -152,7 +170,7 @@ export async function uploadDIDDocument(
       });
     });
 
-    await firstAtc.execute(algodClient, 3);
+    await tryExecute(firstAtc, algodClient);
 
     if (secondGroup.length === 0) return;
 
@@ -169,7 +187,7 @@ export async function uploadDIDDocument(
       });
     });
 
-    await secondAtc.execute(algodClient, 3);
+    await tryExecute(secondAtc, algodClient);
   });
 
   await Promise.all(boxPromises);
