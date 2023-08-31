@@ -27,3 +27,14 @@ Given a DID (`algo:did:${address}-${appID}`), returns the data stored in box sto
 * Currently no way to delete/update documents
 * SDK is missing JSON LD validation for document uploading
 
+# How to run
+
+## Dependencies
+- Docker
+- [Algokit](https://github.com/algorandfoundation/algokit-cli)
+
+## Steps
+
+- Run `yarn`
+- Boot localnet with `alogokit localnet start`
+- Run tests with `yarn test`

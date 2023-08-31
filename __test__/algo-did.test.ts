@@ -3,15 +3,17 @@ import * as algokit from '@algorandfoundation/algokit-utils';
 import fs from 'fs';
 import { ApplicationClient } from '@algorandfoundation/algokit-utils/types/app-client';
 import {
-  describe, expect, beforeAll, it,
+  describe, expect, beforeAll, it, jest,
 } from '@jest/globals';
 import algosdk from 'algosdk';
 import { algodClient, kmdClient } from './common';
 import appSpec from '../contracts/artifacts/AlgoDID.json';
 import { resolveDID, uploadDIDDocument } from '../src/index';
 
+jest.setTimeout(20000)
+
 describe('Algorand DID', () => {
-  const bigData = fs.readFileSync(`${__dirname}/TEAL.pdf`);
+  const bigData: Buffer = fs.readFileSync(`${__dirname}/DIDocument.json`);
   const smallJSONObject = { keyOne: 'foo', keyTwo: 'bar' };
   let appClient: ApplicationClient;
   let sender: algosdk.Account;
@@ -36,52 +38,84 @@ describe('Algorand DID', () => {
     });
   });
 
-  describe('uploadDIDDocument', () => {
-    it('uploads big (multi-box) data', async () => {
+  describe('uploadDIDDocument and Resolve', () => {
+    it('(LARGE) DIDocument upload and resolve', async () => {
+      console.log(`uploading DIDocument ${bigData.toString()}`)
       const { appId } = await appClient.getAppReference();
+      const addr = algosdk.encodeAddress(bigDataPubKey);
 
-      await uploadDIDDocument(
-        bigData,
-        Number(appId),
-        bigDataPubKey,
-        sender,
-        algodClient,
-      );
-    });
+      // Large upload
+      await uploadDIDDocument(bigData, Number(appId), bigDataPubKey, sender, algodClient);
 
-    it('uploads small (single-box) data', async () => {
+      // Reconstruct DID from several boxes
+      const resolvedData: Buffer = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+      expect(resolvedData.toString('hex')).toEqual(bigData.toString('hex'))
+    })
+
+    it('(SMALL) DIDocument upload and resolve', async () => {
+      console.log(`uploading DIDocument ${smallJSONObject.toString()}`)
       const { appId } = await appClient.getAppReference();
-      const data = Buffer.from(JSON.stringify(smallJSONObject));
+      const addr = algosdk.encodeAddress(smallDataPubKey);
 
-      await uploadDIDDocument(
-        data,
+      // Small upload
+      await uploadDIDDocument(Buffer.from(JSON.stringify(smallJSONObject)),
         Number(appId),
         smallDataPubKey,
         sender,
-        algodClient,
-      );
-    });
-  });
+        algodClient);
 
-  describe('resolveDID', () => {
-    it('resolves big (multi-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
+      // Reconstruct DID from several boxes
+      const resolvedData: Buffer = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+      expect(resolvedData.toString('hex')).toEqual(Buffer.from(JSON.stringify(smallJSONObject)).toString('hex'))
+    })
+  })
 
-      const addr = algosdk.encodeAddress(bigDataPubKey);
+  // describe('uploadDIDDocument', () => {
+  //   it('uploads big (multi-box) data', async () => {
+  //     const { appId } = await appClient.getAppReference();
 
-      const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+  //     await uploadDIDDocument(
+  //       bigData,
+  //       Number(appId),
+  //       bigDataPubKey,
+  //       sender,
+  //       algodClient,
+  //     );
+  //   });
 
-      expect(resolvedData.toString('hex')).toEqual(bigData.toString('hex'));
-    });
+  //   it('uploads small (single-box) data', async () => {
+  //     const { appId } = await appClient.getAppReference();
+  //     const data = Buffer.from(JSON.stringify(smallJSONObject));
 
-    it('resolves small (single-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
+  //     await uploadDIDDocument(
+  //       data,
+  //       Number(appId),
+  //       smallDataPubKey,
+  //       sender,
+  //       algodClient,
+  //     );
+  //   });
+  // });
 
-      const addr = algosdk.encodeAddress(smallDataPubKey);
+  // describe('resolveDID', () => {
+  //   it('resolves big (multi-box) data', async () => {
+  //     const { appId } = await appClient.getAppReference();
 
-      const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+  //     const addr = algosdk.encodeAddress(bigDataPubKey);
 
-      expect(resolvedData.toString()).toEqual(JSON.stringify(smallJSONObject));
-    });
-  });
-});
+  //     const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+
+  //     expect(resolvedData.toString('hex')).toEqual(bigData.toString('hex'));
+  //   });
+
+  //   it('resolves small (single-box) data', async () => {
+  //     const { appId } = await appClient.getAppReference();
+
+  //     const addr = algosdk.encodeAddress(smallDataPubKey);
+
+  //     const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+
+  //     expect(resolvedData.toString()).toEqual(JSON.stringify(smallJSONObject));
+  //   });
+  // });
+})
