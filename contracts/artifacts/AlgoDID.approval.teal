@@ -18,6 +18,11 @@ abi_route_startUpload:
 	txn GroupIndex
 	int 1
 	-
+	dup
+	gtxns TypeEnum
+	int pay
+	==
+	assert
 	txna ApplicationArgs 3
 	btoi
 	txna ApplicationArgs 2
@@ -40,7 +45,7 @@ startUpload:
 	assert
 
 	// contracts/algo-did.algo.ts:44
-	// startBox = this.currentIndex.get()
+	// startBox = this.currentIndex.value
 	byte "currentIndex"
 	app_global_get
 	frame_bury -5 // startBox: uint64
@@ -58,51 +63,18 @@ startUpload:
 	// metadata: Metadata = {
 	frame_dig -5 // startBox: uint64
 	itob
-	byte 0xFFFFFFFFFFFFFFFF
-	b&
-	dupn 2
-	byte 0xFFFFFFFFFFFFFFFF
-	b<=
-	assert
-	len
-	int 8
-	-
-	int 8
-	extract3
 	frame_dig -6 // endBox: uint64
 	itob
-	byte 0xFFFFFFFFFFFFFFFF
-	b&
-	dupn 2
-	byte 0xFFFFFFFFFFFFFFFF
-	b<=
-	assert
-	len
-	int 8
-	-
-	int 8
-	extract3
 	concat
 	byte 0x01
 	concat
 	frame_dig -3 // endBoxSize: uint64
 	itob
-	byte 0xFFFFFFFFFFFFFFFF
-	b&
-	dupn 2
-	byte 0xFFFFFFFFFFFFFFFF
-	b<=
-	assert
-	len
-	int 8
-	-
-	int 8
-	extract3
 	concat
 	frame_bury -7 // metadata: Metadata
 
 	// contracts/algo-did.algo.ts:51
-	// assert(!this.metadata.exists(pubKey))
+	// assert(!this.metadata(pubKey).exists)
 	frame_dig -1 // pubKey: address
 	box_len
 	swap
@@ -111,13 +83,13 @@ startUpload:
 	assert
 
 	// contracts/algo-did.algo.ts:53
-	// this.metadata.set(pubKey, metadata)
+	// this.metadata(pubKey).value = metadata
 	frame_dig -1 // pubKey: address
 	frame_dig -7 // metadata: Metadata
 	box_put
 
 	// contracts/algo-did.algo.ts:55
-	// this.currentIndex.set(endBox + 1)
+	// this.currentIndex.value = endBox + 1
 	byte "currentIndex"
 	frame_dig -6 // endBox: uint64
 	int 1
@@ -208,7 +180,7 @@ upload:
 	assert
 
 	// contracts/algo-did.algo.ts:79
-	// metadata = this.metadata.get(pubKey)
+	// metadata = this.metadata(pubKey).value
 	frame_dig -1 // pubKey: address
 	frame_bury -5 // storage key//metadata
 
@@ -276,7 +248,7 @@ skip_and0:
 
 	// if0_consequent
 	// contracts/algo-did.algo.ts:84
-	// this.dataBoxes.create(boxIndex, boxIndex === metadata.end ? metadata.endSize : MAX_BOX_SIZE)
+	// this.dataBoxes(boxIndex).create(boxIndex === metadata.end ? metadata.endSize : MAX_BOX_SIZE)
 	frame_dig -2 // boxIndex: uint64
 	itob
 	frame_dig -2 // boxIndex: uint64
@@ -316,7 +288,7 @@ ternary0_end:
 
 if0_end:
 	// contracts/algo-did.algo.ts:87
-	// this.dataBoxes.replace(boxIndex, offset, data)
+	// this.dataBoxes(boxIndex).replace(offset, data)
 	frame_dig -2 // boxIndex: uint64
 	itob
 	frame_dig -3 // offset: uint64
@@ -344,7 +316,7 @@ finishUpload:
 	assert
 
 	// contracts/algo-did.algo.ts:99
-	// this.metadata.get(pubKey).uploading = 0
+	// this.metadata(pubKey).value.uploading = 0
 	frame_dig -1 // pubKey: address
 	box_get
 	assert
@@ -354,8 +326,7 @@ finishUpload:
 	+
 	load 0 // full array
 	swap
-	int 0
-	itob
+	byte 0x00
 	replace3
 	frame_dig -1 // pubKey: address
 	swap
@@ -368,7 +339,7 @@ abi_route_defaultTEALScriptCreate:
 
 create_NoOp:
 	txn NumAppArgs
-	switch abi_route_defaultTEALScriptCreate
+	bz abi_route_defaultTEALScriptCreate
 	err
 
 call_NoOp:

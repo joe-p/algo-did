@@ -16,13 +16,13 @@ const MAX_BOX_SIZE = 32768;
 // eslint-disable-next-line no-unused-vars
 class AlgoDID extends Contract {
   // The boxes that contain the data, indexed by uint64
-  dataBoxes = new BoxMap<uint64, bytes>();
+  dataBoxes = BoxMap<uint64, bytes>();
 
   // Metadata for a given pubkey
-  metadata = new BoxMap<Address, Metadata>();
+  metadata = BoxMap<Address, Metadata>();
 
   // The index of the next box to be created
-  currentIndex = new GlobalStateKey<uint64>();
+  currentIndex = GlobalStateKey<uint64>();
 
   /**
    *
@@ -41,18 +41,18 @@ class AlgoDID extends Contract {
   ): void {
     assert(this.txn.sender === this.app.creator);
 
-    const startBox = this.currentIndex.get();
+    const startBox = this.currentIndex.value;
     const endBox = startBox + numBoxes - 1;
 
     const metadata: Metadata = {
       start: startBox, end: endBox, uploading: 1, endSize: endBoxSize,
     };
 
-    assert(!this.metadata.exists(pubKey));
+    assert(!this.metadata(pubKey).exists);
 
-    this.metadata.set(pubKey, metadata);
+    this.metadata(pubKey).value = metadata;
 
-    this.currentIndex.set(endBox + 1);
+    this.currentIndex.value = endBox + 1;
 
     const totalCost = numBoxes * COST_PER_BOX // cost of data boxes
     + (numBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
@@ -76,15 +76,15 @@ class AlgoDID extends Contract {
   upload(pubKey: Address, boxIndex: uint64, offset: uint64, data: bytes): void {
     assert(this.txn.sender === this.app.creator);
 
-    const metadata = this.metadata.get(pubKey);
+    const metadata = this.metadata(pubKey).value;
     assert(metadata.uploading === <uint<8>>1);
     assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
 
     if (offset === 0) {
-      this.dataBoxes.create(boxIndex, boxIndex === metadata.end ? metadata.endSize : MAX_BOX_SIZE);
+      this.dataBoxes(boxIndex).create(boxIndex === metadata.end ? metadata.endSize : MAX_BOX_SIZE);
     }
 
-    this.dataBoxes.replace(boxIndex, offset, data);
+    this.dataBoxes(boxIndex).replace(offset, data);
   }
 
   /**
@@ -96,6 +96,6 @@ class AlgoDID extends Contract {
   finishUpload(pubKey: Address): void {
     assert(this.txn.sender === this.app.creator);
 
-    this.metadata.get(pubKey).uploading = 0;
+    this.metadata(pubKey).value.uploading = 0;
   }
 }
