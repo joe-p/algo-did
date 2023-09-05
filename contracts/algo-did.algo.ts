@@ -1,13 +1,17 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Contract } from '@algorandfoundation/tealscript';
 
+const UPLOADING: uint<8> = 0;
+const READY: uint<8> = 1;
+const DELETING: uint<8> = 2;
+
 /*
 start - The index of the box at which the data starts
 end - The index of the box at which the data ends
-uploading - true if the data is still being uploaded
+status - 0 if uploading, 1 if ready, 2 if deleting
 endSize - The size of the last box
 */
-type Metadata = {start: uint64, end: uint64, uploading: uint<8>, endSize: uint64};
+type Metadata = {start: uint64, end: uint64, status: uint<8>, endSize: uint64};
 
 const COST_PER_BYTE = 400;
 const COST_PER_BOX = 2500;
@@ -45,7 +49,7 @@ class AlgoDID extends Contract {
     const endBox = startBox + numBoxes - 1;
 
     const metadata: Metadata = {
-      start: startBox, end: endBox, uploading: 1, endSize: endBoxSize,
+      start: startBox, end: endBox, status: UPLOADING, endSize: endBoxSize,
     };
 
     assert(!this.metadata(pubKey).exists);
@@ -77,7 +81,7 @@ class AlgoDID extends Contract {
     assert(this.txn.sender === this.app.creator);
 
     const metadata = this.metadata(pubKey).value;
-    assert(metadata.uploading === <uint<8>>1);
+    assert(metadata.status === UPLOADING);
     assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
 
     if (offset === 0) {
@@ -96,6 +100,6 @@ class AlgoDID extends Contract {
   finishUpload(pubKey: Address): void {
     assert(this.txn.sender === this.app.creator);
 
-    this.metadata(pubKey).value.uploading = 0;
+    this.metadata(pubKey).value.status = READY;
   }
 }

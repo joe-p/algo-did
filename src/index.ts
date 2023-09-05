@@ -12,7 +12,7 @@ const BYTES_PER_CALL = 2048
 - 8 // 8 bytes for the box index
 - 8; // 8 bytes for the offset
 
-export type Metadata = {start: bigint, end: bigint, uploading: bigint, endSize: bigint};
+export type Metadata = {start: bigint, end: bigint, status: bigint, endSize: bigint};
 
 export async function resolveDID(did: string, algodClient: algosdk.Algodv2): Promise<Buffer> {
   const splitDid = did.split(':');
@@ -48,10 +48,11 @@ export async function resolveDID(did: string, algodClient: algosdk.Algodv2): Pro
   const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
 
   const metadata: Metadata = {
-    start: boxValue[0], end: boxValue[1], uploading: boxValue[2], endSize: boxValue[3],
+    start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
   };
 
-  if (metadata.uploading) throw new Error('DID document is still being uploaded');
+  if (metadata.status === BigInt(0)) throw new Error('DID document is still being uploaded');
+  if (metadata.status === BigInt(2)) throw new Error('DID document is being deleted');
 
   const boxPromises = [];
   for (let i = metadata.start; i <= metadata.end; i += 1n) {
@@ -124,7 +125,7 @@ export async function uploadDIDDocument(
   const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
 
   const metadata: Metadata = {
-    start: boxValue[0], end: boxValue[1], uploading: boxValue[2], endSize: boxValue[3],
+    start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
   };
 
   const numBoxes = Math.floor(data.byteLength / MAX_BOX_SIZE);
