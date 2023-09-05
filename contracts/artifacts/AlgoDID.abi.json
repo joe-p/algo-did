@@ -76,6 +76,41 @@
         "type": "void",
         "desc": ""
       }
+    },
+    {
+      "name": "startDelete",
+      "args": [
+        {
+          "name": "pubKey",
+          "type": "address",
+          "desc": "The address of the DID"
+        }
+      ],
+      "desc": "Starts the deletion process for the data associated with a DID",
+      "returns": {
+        "type": "void",
+        "desc": ""
+      }
+    },
+    {
+      "name": "deleteData",
+      "args": [
+        {
+          "name": "pubKey",
+          "type": "address",
+          "desc": "The address of the DID"
+        },
+        {
+          "name": "boxIndex",
+          "type": "uint64",
+          "desc": "The index of the box to delete"
+        }
+      ],
+      "desc": "Deletes a box of data",
+      "returns": {
+        "type": "void",
+        "desc": ""
+      }
     }
   ]
 }

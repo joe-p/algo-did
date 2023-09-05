@@ -102,4 +102,45 @@ class AlgoDID extends Contract {
 
     this.metadata(pubKey).value.status = READY;
   }
+
+  /**
+   * Starts the deletion process for the data associated with a DID
+   *
+   * @param pubKey The address of the DID
+   */
+  startDelete(pubKey: Address): void {
+    assert(this.txn.sender === this.app.creator);
+
+    const metadata = this.metadata(pubKey).value;
+    assert(metadata.status === READY);
+
+    metadata.status = DELETING;
+  }
+
+  /**
+   * Deletes a box of data
+   *
+   * @param pubKey The address of the DID
+   * @param boxIndex The index of the box to delete
+   */
+  deleteData(pubKey: Address, boxIndex: uint64): void {
+    assert(this.txn.sender === this.app.creator);
+
+    const metadata = this.metadata(pubKey).value;
+    assert(metadata.status === DELETING);
+    assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
+
+    if (boxIndex !== metadata.start) assert(!this.dataBoxes(boxIndex - 1).exists);
+
+    const preMBR = globals.currentApplicationAddress.minBalance;
+
+    this.dataBoxes(boxIndex).delete();
+    if (boxIndex === metadata.end) this.metadata(pubKey).delete();
+
+    sendPayment({
+      fee: 0,
+      amount: preMBR - globals.currentApplicationAddress.minBalance,
+      receiver: this.txn.sender,
+    });
+  }
 }

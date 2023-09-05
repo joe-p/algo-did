@@ -345,6 +345,246 @@ finishUpload:
 	box_put
 	retsub
 
+abi_route_startDelete:
+	byte 0x
+	txna ApplicationArgs 1
+	callsub startDelete
+	int 1
+	return
+
+startDelete:
+	proto 2 0
+
+	// contracts/algo-did.algo.ts:112
+	// assert(this.txn.sender === this.app.creator)
+	txn Sender
+	txna Applications 0
+	app_params_get AppCreator
+	assert
+	==
+	assert
+
+	// contracts/algo-did.algo.ts:114
+	// metadata = this.metadata(pubKey).value
+	frame_dig -1 // pubKey: address
+	frame_bury -2 // storage key//metadata
+
+	// contracts/algo-did.algo.ts:115
+	// assert(metadata.status === READY)
+	frame_dig -2 // storage key//metadata
+	box_get
+	assert
+	store 0 // full array
+	int 0 // initial offset
+	int 16 // headOffset
+	+
+	load 0 // full array
+	swap
+	int 1
+	extract3
+	int 1
+	itob
+	b==
+	assert
+
+	// contracts/algo-did.algo.ts:117
+	// metadata.status = DELETING
+	frame_dig -2 // storage key//metadata
+	box_get
+	assert
+	store 0 // full array
+	int 0 // initial offset
+	int 16 // headOffset
+	+
+	load 0 // full array
+	swap
+	byte 0x02
+	replace3
+	frame_dig -2 // storage key//metadata
+	swap
+	box_put
+	retsub
+
+abi_route_deleteData:
+	byte 0x; dup
+	txna ApplicationArgs 2
+	btoi
+	txna ApplicationArgs 1
+	callsub deleteData
+	int 1
+	return
+
+deleteData:
+	proto 4 0
+
+	// contracts/algo-did.algo.ts:127
+	// assert(this.txn.sender === this.app.creator)
+	txn Sender
+	txna Applications 0
+	app_params_get AppCreator
+	assert
+	==
+	assert
+
+	// contracts/algo-did.algo.ts:129
+	// metadata = this.metadata(pubKey).value
+	frame_dig -1 // pubKey: address
+	frame_bury -3 // storage key//metadata
+
+	// contracts/algo-did.algo.ts:130
+	// assert(metadata.status === DELETING)
+	frame_dig -3 // storage key//metadata
+	box_get
+	assert
+	store 0 // full array
+	int 0 // initial offset
+	int 16 // headOffset
+	+
+	load 0 // full array
+	swap
+	int 1
+	extract3
+	int 2
+	itob
+	b==
+	assert
+
+	// contracts/algo-did.algo.ts:131
+	// assert(metadata.start <= boxIndex && boxIndex <= metadata.end)
+	frame_dig -3 // storage key//metadata
+	box_get
+	assert
+	store 0 // full array
+	int 0 // initial offset
+	int 0 // headOffset
+	+
+	load 0 // full array
+	swap
+	int 8
+	extract3
+	btoi
+	frame_dig -2 // boxIndex: uint64
+	<=
+	dup
+	bz skip_and1
+	frame_dig -2 // boxIndex: uint64
+	frame_dig -3 // storage key//metadata
+	box_get
+	assert
+	store 0 // full array
+	int 0 // initial offset
+	int 8 // headOffset
+	+
+	load 0 // full array
+	swap
+	int 8
+	extract3
+	btoi
+	<=
+	&&
+
+skip_and1:
+	assert
+
+	// if1_condition
+	// contracts/algo-did.algo.ts:133
+	// boxIndex !== metadata.start
+	frame_dig -2 // boxIndex: uint64
+	frame_dig -3 // storage key//metadata
+	box_get
+	assert
+	store 0 // full array
+	int 0 // initial offset
+	int 0 // headOffset
+	+
+	load 0 // full array
+	swap
+	int 8
+	extract3
+	btoi
+	!=
+	bz if1_end
+
+	// if1_consequent
+	// contracts/algo-did.algo.ts:133
+	// assert(!this.dataBoxes(boxIndex - 1).exists)
+	frame_dig -2 // boxIndex: uint64
+	int 1
+	-
+	itob
+	box_len
+	swap
+	pop
+	!
+	assert
+
+if1_end:
+	// contracts/algo-did.algo.ts:135
+	// preMBR = globals.currentApplicationAddress.minBalance
+	global CurrentApplicationAddress
+	acct_params_get AcctMinBalance
+	assert
+	frame_bury -4 // preMBR: uint64
+
+	// contracts/algo-did.algo.ts:137
+	// this.dataBoxes(boxIndex).delete()
+	frame_dig -2 // boxIndex: uint64
+	itob
+	box_del
+
+	// if2_condition
+	// contracts/algo-did.algo.ts:138
+	// boxIndex === metadata.end
+	frame_dig -2 // boxIndex: uint64
+	frame_dig -3 // storage key//metadata
+	box_get
+	assert
+	store 0 // full array
+	int 0 // initial offset
+	int 8 // headOffset
+	+
+	load 0 // full array
+	swap
+	int 8
+	extract3
+	btoi
+	==
+	bz if2_end
+
+	// if2_consequent
+	// contracts/algo-did.algo.ts:138
+	// this.metadata(pubKey).delete()
+	frame_dig -1 // pubKey: address
+	box_del
+
+if2_end:
+	// contracts/algo-did.algo.ts:140
+	// sendPayment({
+	itxn_begin
+	int pay
+	itxn_field TypeEnum
+
+	// contracts/algo-did.algo.ts:141
+	// fee: 0
+	int 0
+	itxn_field Fee
+
+	// contracts/algo-did.algo.ts:142
+	// amount: preMBR - globals.currentApplicationAddress.minBalance
+	frame_dig -4 // preMBR: uint64
+	global CurrentApplicationAddress
+	acct_params_get AcctMinBalance
+	assert
+	-
+	itxn_field Amount
+
+	// contracts/algo-did.algo.ts:143
+	// receiver: this.txn.sender
+	txn Sender
+	itxn_field Receiver
+	itxn_submit
+	retsub
+
 abi_route_defaultTEALScriptCreate:
 	int 1
 	return
@@ -358,6 +598,8 @@ call_NoOp:
 	method "startUpload(address,uint64,uint64,pay)void"
 	method "upload(address,uint64,uint64,byte[])void"
 	method "finishUpload(address)void"
+	method "startDelete(address)void"
+	method "deleteData(address,uint64)void"
 	txna ApplicationArgs 0
-	match abi_route_startUpload abi_route_upload abi_route_finishUpload
+	match abi_route_startUpload abi_route_upload abi_route_finishUpload abi_route_startDelete abi_route_deleteData
 	err
