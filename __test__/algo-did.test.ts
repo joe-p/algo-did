@@ -8,7 +8,7 @@ import {
 import algosdk from 'algosdk';
 import { algodClient, kmdClient } from './common';
 import appSpec from '../contracts/artifacts/AlgoDID.json';
-import { resolveDID, uploadDIDDocument } from '../src/index';
+import { resolveDID, uploadDIDDocument, deleteDIDDocument } from '../src/index';
 
 describe('Algorand DID', () => {
   const bigData = fs.readFileSync(`${__dirname}/TEAL.pdf`);
@@ -82,6 +82,25 @@ describe('Algorand DID', () => {
       const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
 
       expect(resolvedData.toString()).toEqual(JSON.stringify(smallJSONObject));
+    });
+  });
+
+  describe('deleteDIDDocument', () => {
+    it('deletes big (multi-box) data', async () => {
+      const { appId } = await appClient.getAppReference();
+      await deleteDIDDocument(Number(appId), bigDataPubKey, sender, algodClient);
+
+      // TODO: Check that the data is actually deleted
+      // TODO: Check MBR refund
+    });
+
+    it('deletes small (single-box) data', async () => {
+      const { appId } = await appClient.getAppReference();
+
+      await deleteDIDDocument(Number(appId), smallDataPubKey, sender, algodClient);
+
+      // TODO: Check that the data is actually deleted
+      // TODO: Check MBR refund
     });
   });
 });

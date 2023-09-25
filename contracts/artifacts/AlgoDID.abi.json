@@ -111,6 +111,15 @@
         "type": "void",
         "desc": ""
       }
+    },
+    {
+      "name": "dummy",
+      "args": [],
+      "desc": "Dummy function to add extra box references during delete",
+      "returns": {
+        "type": "void",
+        "desc": ""
+      }
     }
   ]
 }

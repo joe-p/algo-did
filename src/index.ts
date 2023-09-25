@@ -205,3 +205,94 @@ export async function uploadDIDDocument(
 
   return metadata;
 }
+
+/*
+export async function uploadDIDDocument(
+  data: Buffer,
+  appID: number,
+  pubKey: Uint8Array,
+  sender: algosdk.Account,
+  algodClient: algosdk.Algodv2,
+): Promise<Metadata> {
+  */
+export async function deleteDIDDocument(
+  appID: number,
+  pubKey: Uint8Array,
+  sender: algosdk.Account,
+  algodClient: algosdk.Algodv2,
+): Promise<void> {
+  const appClient = new ApplicationClient({
+    resolveBy: 'id',
+    id: appID,
+    sender: algosdk.generateAccount(),
+    app: JSON.stringify(appSpec),
+  }, algodClient);
+
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
+
+  const metadata: Metadata = {
+    start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
+  };
+
+  await appClient.call({
+    method: 'startDelete',
+    methodArgs: [pubKey],
+    boxes: [
+      pubKey,
+    ],
+    sender,
+    sendParams: { suppressLog: true },
+  });
+
+  const suggestedParams = await algodClient.getTransactionParams().do();
+
+  const executePromises = [];
+  for (let boxIndex = metadata.start; boxIndex <= metadata.end; boxIndex += 1n) {
+    const atc = new algosdk.AtomicTransactionComposer();
+    const boxIndexRef = { appIndex: appID, name: algosdk.encodeUint64(boxIndex) };
+    atc.addMethodCall({
+      appID,
+      method: appClient.getABIMethod('deleteData')!,
+      methodArgs: [pubKey, boxIndex],
+      boxes: [
+        { appIndex: appID, name: pubKey },
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+      ],
+      suggestedParams: { ...suggestedParams, fee: 2000, flatFee: true },
+      sender: sender.addr,
+      signer: algosdk.makeBasicAccountTransactionSigner(sender),
+    });
+
+    for (let i = 0; i < 4; i += 1) {
+      atc.addMethodCall({
+        appID,
+        method: appClient.getABIMethod('dummy')!,
+        methodArgs: [],
+        boxes: [
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+        ],
+        suggestedParams,
+        sender: sender.addr,
+        signer: algosdk.makeBasicAccountTransactionSigner(sender),
+        note: new Uint8Array(Buffer.from(`dummy ${i}`)),
+      });
+    }
+
+    executePromises.push(atc.execute(algodClient, 3));
+  }
+
+  await Promise.all(executePromises);
+}

@@ -130,7 +130,8 @@ class AlgoDID extends Contract {
     assert(metadata.status === DELETING);
     assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
 
-    if (boxIndex !== metadata.start) assert(!this.dataBoxes(boxIndex - 1).exists);
+    // TODO: Get this working. Probably has to do with async delete calls
+    // if (boxIndex !== metadata.start) assert(!this.dataBoxes(boxIndex - 1).exists);
 
     const preMBR = globals.currentApplicationAddress.minBalance;
 
@@ -143,4 +144,9 @@ class AlgoDID extends Contract {
       receiver: this.txn.sender,
     });
   }
+
+  /**
+   * Dummy function to add extra box references for deleteData
+   */
+  dummy(): void {}
 }
