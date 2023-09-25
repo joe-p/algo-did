@@ -115,7 +115,7 @@
     {
       "name": "dummy",
       "args": [],
-      "desc": "Dummy function to add extra box references during delete",
+      "desc": "Dummy function to add extra box references for deleteData",
       "returns": {
         "type": "void",
         "desc": ""

@@ -11,7 +11,7 @@ end - The index of the box at which the data ends
 status - 0 if uploading, 1 if ready, 2 if deleting
 endSize - The size of the last box
 */
-type Metadata = {start: uint64, end: uint64, status: uint<8>, endSize: uint64};
+type Metadata = {start: uint64, end: uint64, status: uint<8>, endSize: uint64, lastDeleted: uint64};
 
 const COST_PER_BYTE = 400;
 const COST_PER_BOX = 2500;
@@ -27,6 +27,10 @@ class AlgoDID extends Contract {
 
   // The index of the next box to be created
   currentIndex = GlobalStateKey<uint64>();
+
+  createApplication(): void {
+    this.currentIndex.value = 1;
+  }
 
   /**
    *
@@ -49,7 +53,7 @@ class AlgoDID extends Contract {
     const endBox = startBox + numBoxes - 1;
 
     const metadata: Metadata = {
-      start: startBox, end: endBox, status: UPLOADING, endSize: endBoxSize,
+      start: startBox, end: endBox, status: UPLOADING, endSize: endBoxSize, lastDeleted: 0,
     };
 
     assert(!this.metadata(pubKey).exists);
@@ -62,7 +66,7 @@ class AlgoDID extends Contract {
     + (numBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
     + numBoxes * 8 * COST_PER_BYTE // cost of data keys
     + endBoxSize * COST_PER_BYTE // cost of last data box
-    + COST_PER_BOX + (8 + 8 + 1 + 8 + 32) * COST_PER_BYTE; // cost of metadata box
+    + COST_PER_BOX + (8 + 8 + 1 + 8 + 32 + 8) * COST_PER_BYTE; // cost of metadata box
 
     assert(mbrPayment.amount === totalCost);
     assert(mbrPayment.receiver === this.app.address);
@@ -130,13 +134,15 @@ class AlgoDID extends Contract {
     assert(metadata.status === DELETING);
     assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
 
-    // TODO: Get this working. Probably has to do with async delete calls
-    // if (boxIndex !== metadata.start) assert(!this.dataBoxes(boxIndex - 1).exists);
+    // TODO: debug this
+    // if (boxIndex !== metadata.start) assert(metadata.lastDeleted === boxIndex - 1);
 
     const preMBR = globals.currentApplicationAddress.minBalance;
 
     this.dataBoxes(boxIndex).delete();
+
     if (boxIndex === metadata.end) this.metadata(pubKey).delete();
+    else metadata.lastDeleted = boxIndex;
 
     sendPayment({
       fee: 0,

@@ -45,7 +45,7 @@ export async function resolveDID(did: string, algodClient: algosdk.Algodv2): Pro
     app: JSON.stringify(appSpec),
   }, algodClient);
 
-  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64,uint64)'))).valueOf() as bigint[];
 
   const metadata: Metadata = {
     start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
@@ -69,11 +69,28 @@ async function tryExecute(
   algodClient: algosdk.Algodv2,
   retryCount = 1,
 ): Promise<void> {
-  if (retryCount > 3) throw Error('Failed to execute transaction group after 3 retries');
-
   try {
     await atc.execute(algodClient, 3);
   } catch (e) {
+    if (retryCount === 3) {
+      // TODO: SDK bugfix
+      // const execTraceConfig = new algosdk.modelsv2.SimulateTraceConfig({
+      //   enable: true,
+      //   stackChange: true,
+      //   stateChange: true,
+      //   scratchChange: true,
+      // });
+
+      // const simReq = new algosdk.modelsv2.SimulateRequest({
+      //   txnGroups: [],
+      //   execTraceConfig,
+      // });
+      // const result = await atc.simulate(algodClient, simReq);
+
+      // console.warn(result.simulateResponse.txnGroups[0].txnResults[0].execTrace);
+      throw e;
+    }
+
     // eslint-disable-next-line no-console
     console.warn(`Failed to send transaction group. Retrying in ${500 * retryCount}ms (${retryCount / 3})`);
 
@@ -104,7 +121,7 @@ export async function uploadDIDDocument(
   + (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
   + ceilBoxes * 8 * COST_PER_BYTE // cost of data keys
   + endBoxSize * COST_PER_BYTE // cost of last data box
-  + COST_PER_BOX + (8 + 8 + 1 + 8 + 32) * COST_PER_BYTE; // cost of metadata box
+  + COST_PER_BOX + (8 + 8 + 1 + 8 + 32 + 8) * COST_PER_BYTE; // cost of metadata box
 
   const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
     from: sender.addr,
@@ -122,7 +139,7 @@ export async function uploadDIDDocument(
     sendParams: { suppressLog: true },
   });
 
-  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64,uint64)'))).valueOf() as bigint[];
 
   const metadata: Metadata = {
     start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
@@ -228,7 +245,7 @@ export async function deleteDIDDocument(
     app: JSON.stringify(appSpec),
   }, algodClient);
 
-  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64,uint64)'))).valueOf() as bigint[];
 
   const metadata: Metadata = {
     start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
@@ -291,7 +308,7 @@ export async function deleteDIDDocument(
       });
     }
 
-    executePromises.push(atc.execute(algodClient, 3));
+    executePromises.push(tryExecute(atc, algodClient));
   }
 
   await Promise.all(executePromises);
