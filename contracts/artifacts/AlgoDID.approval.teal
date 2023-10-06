@@ -17,7 +17,7 @@ int 6
 *
 txn OnCompletion
 +
-switch create_NoOp NOT_IMPLEMENTED NOT_IMPLEMENTED NOT_IMPLEMENTED NOT_IMPLEMENTED NOT_IMPLEMENTED call_NoOp
+switch create_NoOp NOT_IMPLEMENTED NOT_IMPLEMENTED NOT_IMPLEMENTED NOT_IMPLEMENTED NOT_IMPLEMENTED call_NoOp NOT_IMPLEMENTED NOT_IMPLEMENTED NOT_IMPLEMENTED call_UpdateApplication
 
 NOT_IMPLEMENTED:
 	err
@@ -81,11 +81,9 @@ startUpload:
 	proto 8 0
 
 	// contracts/algo-did.algo.ts:50
-	// assert(this.txn.sender === this.app.creator)
+	// assert(this.txn.sender === globals.creatorAddress)
 	txn Sender
-	txna Applications 0
-	app_params_get AppCreator
-	assert
+	global CreatorAddress
 	==
 	assert
 
@@ -244,11 +242,9 @@ upload:
 	proto 5 0
 
 	// contracts/algo-did.algo.ts:85
-	// assert(this.txn.sender === this.app.creator)
+	// assert(this.txn.sender === globals.creatorAddress)
 	txn Sender
-	txna Applications 0
-	app_params_get AppCreator
-	assert
+	global CreatorAddress
 	==
 	assert
 
@@ -353,11 +349,9 @@ finishUpload:
 	proto 1 0
 
 	// contracts/algo-did.algo.ts:105
-	// assert(this.txn.sender === this.app.creator)
+	// assert(this.txn.sender === globals.creatorAddress)
 	txn Sender
-	txna Applications 0
-	app_params_get AppCreator
-	assert
+	global CreatorAddress
 	==
 	assert
 
@@ -393,11 +387,9 @@ startDelete:
 	proto 2 0
 
 	// contracts/algo-did.algo.ts:116
-	// assert(this.txn.sender === this.app.creator)
+	// assert(this.txn.sender === globals.creatorAddress)
 	txn Sender
-	txna Applications 0
-	app_params_get AppCreator
-	assert
+	global CreatorAddress
 	==
 	assert
 
@@ -453,11 +445,9 @@ deleteData:
 	proto 4 0
 
 	// contracts/algo-did.algo.ts:131
-	// assert(this.txn.sender === this.app.creator)
+	// assert(this.txn.sender === globals.creatorAddress)
 	txn Sender
-	txna Applications 0
-	app_params_get AppCreator
-	assert
+	global CreatorAddress
 	==
 	assert
 
@@ -583,6 +573,26 @@ dummy:
 	proto 0 0
 	retsub
 
+// updateApplication()void
+//
+// Allow the contract to be updated by the creator
+abi_route_updateApplication:
+	// execute updateApplication()void
+	callsub updateApplication
+	int 1
+	return
+
+updateApplication:
+	proto 0 0
+
+	// contracts/algo-did.algo.ts:163
+	// assert(globals.creatorAddress === this.txn.sender)
+	global CreatorAddress
+	txn Sender
+	==
+	assert
+	retsub
+
 create_NoOp:
 	method "createApplication()void"
 	txna ApplicationArgs 0
@@ -598,4 +608,10 @@ call_NoOp:
 	method "dummy()void"
 	txna ApplicationArgs 0
 	match abi_route_startUpload abi_route_upload abi_route_finishUpload abi_route_startDelete abi_route_deleteData abi_route_dummy
+	err
+
+call_UpdateApplication:
+	method "updateApplication()void"
+	txna ApplicationArgs 0
+	match abi_route_updateApplication
 	err

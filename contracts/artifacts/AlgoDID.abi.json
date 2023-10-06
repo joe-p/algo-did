@@ -129,6 +129,15 @@
         "type": "void",
         "desc": ""
       }
+    },
+    {
+      "name": "updateApplication",
+      "args": [],
+      "desc": "Allow the contract to be updated by the creator",
+      "returns": {
+        "type": "void",
+        "desc": ""
+      }
     }
   ]
 }

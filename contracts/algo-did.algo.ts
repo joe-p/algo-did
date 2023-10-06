@@ -47,7 +47,7 @@ class AlgoDID extends Contract {
     endBoxSize: uint64,
     mbrPayment: PayTxn,
   ): void {
-    assert(this.txn.sender === this.app.creator);
+    assert(this.txn.sender === globals.creatorAddress);
 
     const startBox = this.currentIndex.value;
     const endBox = startBox + numBoxes - 1;
@@ -82,7 +82,7 @@ class AlgoDID extends Contract {
    * @param data The data to write
    */
   upload(pubKey: Address, boxIndex: uint64, offset: uint64, data: bytes): void {
-    assert(this.txn.sender === this.app.creator);
+    assert(this.txn.sender === globals.creatorAddress);
 
     const metadata = this.metadata(pubKey).value;
     assert(metadata.status === UPLOADING);
@@ -102,7 +102,7 @@ class AlgoDID extends Contract {
    * @param pubKey The address of the DID
    */
   finishUpload(pubKey: Address): void {
-    assert(this.txn.sender === this.app.creator);
+    assert(this.txn.sender === globals.creatorAddress);
 
     this.metadata(pubKey).value.status = READY;
   }
@@ -113,7 +113,7 @@ class AlgoDID extends Contract {
    * @param pubKey The address of the DID
    */
   startDelete(pubKey: Address): void {
-    assert(this.txn.sender === this.app.creator);
+    assert(this.txn.sender === globals.creatorAddress);
 
     const metadata = this.metadata(pubKey).value;
     assert(metadata.status === READY);
@@ -128,7 +128,7 @@ class AlgoDID extends Contract {
    * @param boxIndex The index of the box to delete
    */
   deleteData(pubKey: Address, boxIndex: uint64): void {
-    assert(this.txn.sender === this.app.creator);
+    assert(this.txn.sender === globals.creatorAddress);
 
     const metadata = this.metadata(pubKey).value;
     assert(metadata.status === DELETING);
@@ -155,4 +155,11 @@ class AlgoDID extends Contract {
    * Dummy function to add extra box references for deleteData
    */
   dummy(): void {}
+
+  /**
+   * Allow the contract to be updated by the creator
+   */
+  updateApplication(): void {
+    assert(globals.creatorAddress === this.txn.sender);
+  }
 }
