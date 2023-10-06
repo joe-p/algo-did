@@ -28,7 +28,7 @@ describe('Algorand DID', () => {
       app: JSON.stringify(appSpec),
     }, algodClient);
 
-    await appClient.create({ sendParams: { suppressLog: true } });
+    await appClient.create({ method: 'createApplication', methodArgs: [], sendParams: { suppressLog: true } });
 
     await appClient.fundAppAccount({
       amount: algokit.microAlgos(100_000),
