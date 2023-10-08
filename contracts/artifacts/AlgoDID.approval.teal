@@ -564,7 +564,6 @@ if2_else:
 if2_end:
 	// contracts/algo-did.algo.ts:149
 	// sendPayment({
-	//       fee: 0,
 	//       amount: preMBR - globals.currentApplicationAddress.minBalance,
 	//       receiver: this.txn.sender,
 	//     })
@@ -573,11 +572,6 @@ if2_end:
 	itxn_field TypeEnum
 
 	// contracts/algo-did.algo.ts:150
-	// fee: 0
-	int 0
-	itxn_field Fee
-
-	// contracts/algo-did.algo.ts:151
 	// amount: preMBR - globals.currentApplicationAddress.minBalance
 	frame_dig -4 // preMBR: uint64
 	global CurrentApplicationAddress
@@ -586,10 +580,14 @@ if2_end:
 	-
 	itxn_field Amount
 
-	// contracts/algo-did.algo.ts:152
+	// contracts/algo-did.algo.ts:151
 	// receiver: this.txn.sender
 	txn Sender
 	itxn_field Receiver
+
+	// Fee field not set, defaulting to 0
+	int 0
+	itxn_field Fee
 
 	// Submit inner transaction
 	itxn_submit
@@ -620,7 +618,7 @@ abi_route_updateApplication:
 updateApplication:
 	proto 0 0
 
-	// contracts/algo-did.algo.ts:165
+	// contracts/algo-did.algo.ts:164
 	// assert(globals.creatorAddress === this.txn.sender)
 	global CreatorAddress
 	txn Sender

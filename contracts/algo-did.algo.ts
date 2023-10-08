@@ -147,7 +147,6 @@ class AlgoDID extends Contract {
     }
 
     sendPayment({
-      fee: 0,
       amount: preMBR - globals.currentApplicationAddress.minBalance,
       receiver: this.txn.sender,
     });

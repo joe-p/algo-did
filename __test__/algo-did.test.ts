@@ -90,8 +90,8 @@ describe('Algorand DID', () => {
       const { appId } = await appClient.getAppReference();
       await deleteDIDDocument(Number(appId), bigDataPubKey, sender, algodClient);
 
-      // TODO: Check that the data is actually deleted
-      // TODO: Check MBR refund
+      const addr = algosdk.encodeAddress(bigDataPubKey);
+      await expect(resolveDID(`did:algo:${addr}-${appId}`, algodClient)).rejects.toThrow();
     });
 
     it('deletes small (single-box) data', async () => {
@@ -99,8 +99,15 @@ describe('Algorand DID', () => {
 
       await deleteDIDDocument(Number(appId), smallDataPubKey, sender, algodClient);
 
-      // TODO: Check that the data is actually deleted
-      // TODO: Check MBR refund
+      const addr = algosdk.encodeAddress(smallDataPubKey);
+      await expect(resolveDID(`did:algo:${addr}-${appId}`, algodClient)).rejects.toThrow();
+    });
+
+    it('returns MBR', async () => {
+      const { appAddress } = await appClient.getAppReference();
+      const appAmount = (await algodClient.accountInformation(appAddress).do()).amount;
+
+      expect(appAmount).toBe(100_000);
     });
   });
 });
