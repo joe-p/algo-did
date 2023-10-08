@@ -320,3 +320,14 @@ export async function deleteDIDDocument(
     await tryExecute(atcAndIndex.atc, algodClient);
   }
 }
+
+export async function updateDIDDocument(
+  data: Buffer,
+  appID: number,
+  pubKey: Uint8Array,
+  sender: algosdk.Account,
+  algodClient: algosdk.Algodv2,
+): Promise<Metadata> {
+  await deleteDIDDocument(appID, pubKey, sender, algodClient);
+  return uploadDIDDocument(data, appID, pubKey, sender, algodClient);
+}
