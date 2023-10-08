@@ -489,21 +489,48 @@ deleteData:
 skip_and1:
 	assert
 
-	// contracts/algo-did.algo.ts:140
+	// if1_condition
+	// contracts/algo-did.algo.ts:137
+	// boxIndex !== metadata.start
+	frame_dig -2 // boxIndex: uint64
+	frame_dig -3 // storage key//metadata
+	box_get
+	assert
+	extract 0 8
+	btoi
+	!=
+	bz if1_end
+
+	// if1_consequent
+	// contracts/algo-did.algo.ts:137
+	// assert(metadata.lastDeleted === boxIndex - 1)
+	frame_dig -3 // storage key//metadata
+	box_get
+	assert
+	extract 25 8
+	btoi
+	frame_dig -2 // boxIndex: uint64
+	int 1
+	-
+	==
+	assert
+
+if1_end:
+	// contracts/algo-did.algo.ts:139
 	// preMBR = globals.currentApplicationAddress.minBalance
 	global CurrentApplicationAddress
 	acct_params_get AcctMinBalance
 	assert
 	frame_bury -4 // preMBR: uint64
 
-	// contracts/algo-did.algo.ts:142
+	// contracts/algo-did.algo.ts:141
 	// this.dataBoxes(boxIndex).delete()
 	frame_dig -2 // boxIndex: uint64
 	itob
 	box_del
 
-	// if1_condition
-	// contracts/algo-did.algo.ts:144
+	// if2_condition
+	// contracts/algo-did.algo.ts:143
 	// boxIndex === metadata.end
 	frame_dig -2 // boxIndex: uint64
 	frame_dig -3 // storage key//metadata
@@ -512,9 +539,17 @@ skip_and1:
 	extract 8 8
 	btoi
 	==
-	bz if1_end
+	bz if2_else
 
-	// contracts/algo-did.algo.ts:145
+	// if2_consequent
+	// contracts/algo-did.algo.ts:144
+	// this.metadata(pubKey).delete()
+	frame_dig -1 // pubKey: address
+	box_del
+	b if2_end
+
+if2_else:
+	// contracts/algo-did.algo.ts:146
 	// metadata.lastDeleted = boxIndex
 	frame_dig -3 // storage key//metadata
 	box_get
@@ -526,8 +561,8 @@ skip_and1:
 	swap
 	box_put
 
-if1_end:
-	// contracts/algo-did.algo.ts:147
+if2_end:
+	// contracts/algo-did.algo.ts:149
 	// sendPayment({
 	//       fee: 0,
 	//       amount: preMBR - globals.currentApplicationAddress.minBalance,
@@ -537,12 +572,12 @@ if1_end:
 	int pay
 	itxn_field TypeEnum
 
-	// contracts/algo-did.algo.ts:148
+	// contracts/algo-did.algo.ts:150
 	// fee: 0
 	int 0
 	itxn_field Fee
 
-	// contracts/algo-did.algo.ts:149
+	// contracts/algo-did.algo.ts:151
 	// amount: preMBR - globals.currentApplicationAddress.minBalance
 	frame_dig -4 // preMBR: uint64
 	global CurrentApplicationAddress
@@ -551,7 +586,7 @@ if1_end:
 	-
 	itxn_field Amount
 
-	// contracts/algo-did.algo.ts:150
+	// contracts/algo-did.algo.ts:152
 	// receiver: this.txn.sender
 	txn Sender
 	itxn_field Receiver
@@ -585,7 +620,7 @@ abi_route_updateApplication:
 updateApplication:
 	proto 0 0
 
-	// contracts/algo-did.algo.ts:163
+	// contracts/algo-did.algo.ts:165
 	// assert(globals.creatorAddress === this.txn.sender)
 	global CreatorAddress
 	txn Sender

@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop */
+/* eslint-disable no-restricted-syntax */
 import algosdk from 'algosdk';
 import { ApplicationClient } from '@algorandfoundation/algokit-utils/types/app-client';
 import appSpec from '../contracts/artifacts/AlgoDID.json';
@@ -157,7 +159,7 @@ export async function uploadDIDDocument(
 
   const suggestedParams = await algodClient.getTransactionParams().do();
 
-  const boxPromises = boxData.map(async (box, boxIndexOffset) => {
+  const processBox = async (box: Buffer, boxIndexOffset: number) => {
     const boxIndex = metadata.start + BigInt(boxIndexOffset);
     const numChunks = Math.ceil(box.byteLength / BYTES_PER_CALL);
 
@@ -206,9 +208,12 @@ export async function uploadDIDDocument(
     });
 
     await tryExecute(secondAtc, algodClient);
-  });
+  };
 
-  await Promise.all(boxPromises);
+  for await (const [index, box] of boxData.entries()) {
+    await processBox(box, index);
+  }
+
   if (Buffer.concat(boxData).toString('hex') !== data.toString('hex')) throw new Error('Data validation failed!');
 
   await appClient.call({
@@ -263,7 +268,7 @@ export async function deleteDIDDocument(
 
   const suggestedParams = await algodClient.getTransactionParams().do();
 
-  const executePromises = [];
+  const atcs: {boxIndex: bigint, atc: algosdk.AtomicTransactionComposer}[] = [];
   for (let boxIndex = metadata.start; boxIndex <= metadata.end; boxIndex += 1n) {
     const atc = new algosdk.AtomicTransactionComposer();
     const boxIndexRef = { appIndex: appID, name: algosdk.encodeUint64(boxIndex) };
@@ -308,8 +313,10 @@ export async function deleteDIDDocument(
       });
     }
 
-    executePromises.push(tryExecute(atc, algodClient));
+    atcs.push({ atc, boxIndex });
   }
 
-  await Promise.all(executePromises);
+  for await (const atcAndIndex of atcs) {
+    await tryExecute(atcAndIndex.atc, algodClient);
+  }
 }

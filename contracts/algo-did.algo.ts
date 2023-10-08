@@ -134,15 +134,17 @@ class AlgoDID extends Contract {
     assert(metadata.status === DELETING);
     assert(metadata.start <= boxIndex && boxIndex <= metadata.end);
 
-    // TODO: debug this
-    // if (boxIndex !== metadata.start) assert(metadata.lastDeleted === boxIndex - 1);
+    if (boxIndex !== metadata.start) assert(metadata.lastDeleted === boxIndex - 1);
 
     const preMBR = globals.currentApplicationAddress.minBalance;
 
     this.dataBoxes(boxIndex).delete();
 
-    if (boxIndex === metadata.end) this.metadata(pubKey).delete();
-    else metadata.lastDeleted = boxIndex;
+    if (boxIndex === metadata.end) {
+      this.metadata(pubKey).delete();
+    } else {
+      metadata.lastDeleted = boxIndex;
+    }
 
     sendPayment({
       fee: 0,
