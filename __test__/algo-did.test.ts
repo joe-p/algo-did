@@ -3,7 +3,7 @@ import * as algokit from '@algorandfoundation/algokit-utils';
 import fs from 'fs';
 import { ApplicationClient } from '@algorandfoundation/algokit-utils/types/app-client';
 import {
-  describe, expect, beforeAll, it,
+  describe, expect, beforeAll, it, jest,
 } from '@jest/globals';
 import algosdk from 'algosdk';
 import { algodClient, kmdClient } from './common';
@@ -11,6 +11,8 @@ import appSpec from '../contracts/artifacts/AlgoDID.json';
 import {
   resolveDID, uploadDIDDocument, deleteDIDDocument, updateDIDDocument,
 } from '../src/index';
+
+jest.setTimeout(20000)
 
 describe('Algorand DID', () => {
   /**
@@ -63,46 +65,35 @@ describe('Algorand DID', () => {
     appId = Number((await appClient.getAppReference()).appId);
   });
 
-  describe('uploadDIDDocument', () => {
-    const uploadDIDDocumentTest = async (documentData: Buffer, userKey: Uint8Array) => {
-      // Upload the DID Document and ensure there is no error
-      // Resolution is in the next test
-      await uploadDIDDocument(
-        documentData,
-        appId,
-        userKey,
-        sender,
-        algodClient,
-      );
-    };
-
-    it('uploads big (multi-box) data', async () => {
-      await uploadDIDDocumentTest(bigData, bigDataUserKey);
-    });
-
-    it('uploads small (single-box) data', async () => {
-      const data = Buffer.from(JSON.stringify(smallJSONObject));
-      await uploadDIDDocumentTest(data, smallDataUserKey);
-    });
-  });
-
-  describe('resolveDID', () => {
-    it('resolves big (multi-box) data', async () => {
+  describe('uploadDIDDocument and Resolve', () => {
+    it('(LARGE) DIDocument upload and resolve', async () => {
+      const { appId } = await appClient.getAppReference();
       const addr = algosdk.encodeAddress(bigDataUserKey);
-      const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
 
-      // Expect binary data to match
-      expect(resolvedData.toString('hex')).toEqual(bigData.toString('hex'));
-    });
+      // Large upload
+      await uploadDIDDocument(bigData, Number(appId), bigDataUserKey, sender, algodClient);
 
-    it('resolves small (single-box) data', async () => {
+      // Reconstruct DID from several boxes
+      const resolvedData: Buffer = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+      expect(resolvedData.toString('hex')).toEqual(bigData.toString('hex'))
+    })
+
+    it('(SMALL) DIDocument upload and resolve', async () => {
+      const { appId } = await appClient.getAppReference();
       const addr = algosdk.encodeAddress(smallDataUserKey);
-      const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
 
-      // Expect JSON object to match
-      expect(resolvedData.toString()).toEqual(JSON.stringify(smallJSONObject));
-    });
-  });
+      // Small upload
+      await uploadDIDDocument(Buffer.from(JSON.stringify(smallJSONObject)),
+        Number(appId),
+        smallDataUserKey,
+        sender,
+        algodClient);
+
+      // Reconstruct DID from several boxes
+      const resolvedData: Buffer = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
+      expect(resolvedData.toString('hex')).toEqual(Buffer.from(JSON.stringify(smallJSONObject)).toString('hex'))
+    })
+  })
 
   describe('deleteDIDDocument', () => {
     const deleteDIDDocumentTest = async (userKey: Uint8Array) => {

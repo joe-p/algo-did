@@ -1,8 +1,11 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-syntax */
-import algosdk from 'algosdk';
+import algosdk, { ABIMethod, ABIResult } from 'algosdk';
 import { ApplicationClient } from '@algorandfoundation/algokit-utils/types/app-client';
 import appSpec from '../contracts/artifacts/AlgoDID.json';
+import { AppCallTransactionResult } from '@algorandfoundation/algokit-utils/types/app';
+import { expect } from '@jest/globals';
+import { SuggestedParamsWithMinFee } from 'algosdk/dist/types/types/transactions/base';
 
 const COST_PER_BYTE = 400;
 const COST_PER_BOX = 2500;
@@ -66,6 +69,53 @@ export async function resolveDID(did: string, algodClient: algosdk.Algodv2): Pro
   return Buffer.concat(boxValues);
 }
 
+/**
+ * 
+ * @param algodClient 
+ * @param abiMethod 
+ * @param pubKey 
+ * @param boxes 
+ * @param boxIndex 
+ * @param suggestedParams 
+ * @param sender 
+ * @param appID 
+ * @param group 
+ * @returns 
+ */
+export async function sendTxGroup(
+    algodClient: algosdk.Algodv2,
+    abiMethod: ABIMethod,
+    bytesOffset: number,
+    pubKey: Uint8Array, 
+    boxes: algosdk.BoxReference[], 
+    boxIndex: bigint,
+    suggestedParams: SuggestedParamsWithMinFee,
+    sender: algosdk.Account,
+    appID: number,
+    group: Buffer[]): Promise<string[]> {
+  const firstAtc = new algosdk.AtomicTransactionComposer();
+  group.forEach((chunk, i) => {
+    firstAtc.addMethodCall({
+      method: abiMethod!,
+      methodArgs: [pubKey, boxIndex, BYTES_PER_CALL * (i + bytesOffset), chunk],
+      boxes,
+      suggestedParams,
+      sender: sender.addr,
+      signer: algosdk.makeBasicAccountTransactionSigner(sender),
+      appID,
+    });
+  });
+
+  await new Promise((r) => setTimeout(r, 2000));
+  return (await firstAtc.execute(algodClient, 3)).txIDs
+}
+
+/**
+ * 
+ * @param atc 
+ * @param algodClient 
+ * @param retryCount 
+ */
 async function tryExecute(
   atc: algosdk.AtomicTransactionComposer,
   algodClient: algosdk.Algodv2,
@@ -95,12 +145,18 @@ async function tryExecute(
 
     // eslint-disable-next-line no-console
     console.warn(`Failed to send transaction group. Retrying in ${500 * retryCount}ms (${retryCount / 3})`);
-
-    await new Promise((r) => { setTimeout(r, 500 * retryCount); });
-    await tryExecute(atc, algodClient, retryCount + 1);
-  }
+}
 }
 
+/**
+ * 
+ * @param data 
+ * @param appID 
+ * @param pubKey 
+ * @param sender 
+ * @param algodClient 
+ * @returns 
+ */
 export async function uploadDIDDocument(
   data: Buffer,
   appID: number,
@@ -132,7 +188,7 @@ export async function uploadDIDDocument(
     suggestedParams: await algodClient.getTransactionParams().do(),
   });
 
-  await appClient.call({
+  const appCallResult: AppCallTransactionResult = await appClient.call({
     method: 'startUpload',
     methodArgs: [pubKey, ceilBoxes, endBoxSize, mbrPayment],
     boxes: [
@@ -140,6 +196,7 @@ export async function uploadDIDDocument(
     ],
     sendParams: { suppressLog: true },
   });
+  expect(appCallResult).toBeDefined();
 
   const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64,uint64)'))).valueOf() as bigint[];
 
@@ -157,9 +214,9 @@ export async function uploadDIDDocument(
 
   boxData.push(data.subarray(numBoxes * MAX_BOX_SIZE, data.byteLength));
 
-  const suggestedParams = await algodClient.getTransactionParams().do();
+  const suggestedParams: SuggestedParamsWithMinFee = await algodClient.getTransactionParams().do();
 
-  const processBox = async (box: Buffer, boxIndexOffset: number) => {
+  const boxPromises = boxData.map(async (box, boxIndexOffset) => {
     const boxIndex = metadata.start + BigInt(boxIndexOffset);
     const numChunks = Math.ceil(box.byteLength / BYTES_PER_CALL);
 
@@ -177,43 +234,15 @@ export async function uploadDIDDocument(
     const firstGroup = chunks.slice(0, 8);
     const secondGroup = chunks.slice(8);
 
-    const firstAtc = new algosdk.AtomicTransactionComposer();
-    firstGroup.forEach((chunk, i) => {
-      firstAtc.addMethodCall({
-        method: appClient.getABIMethod('upload')!,
-        methodArgs: [pubKey, boxIndex, BYTES_PER_CALL * i, chunk],
-        boxes,
-        suggestedParams,
-        sender: sender.addr,
-        signer: algosdk.makeBasicAccountTransactionSigner(sender),
-        appID,
-      });
-    });
-
-    await tryExecute(firstAtc, algodClient);
+    await sendTxGroup(algodClient, appClient.getABIMethod('upload')!, 0, pubKey, boxes, boxIndex, suggestedParams, sender, appID, firstGroup);
 
     if (secondGroup.length === 0) return;
 
-    const secondAtc = new algosdk.AtomicTransactionComposer();
-    secondGroup.forEach((chunk, i) => {
-      secondAtc.addMethodCall({
-        method: appClient.getABIMethod('upload')!,
-        methodArgs: [pubKey, boxIndex, BYTES_PER_CALL * (i + 8), chunk],
-        boxes,
-        suggestedParams,
-        sender: sender.addr,
-        signer: algosdk.makeBasicAccountTransactionSigner(sender),
-        appID,
-      });
-    });
+    await sendTxGroup(algodClient, appClient.getABIMethod('upload')!, 8, pubKey, boxes, boxIndex, suggestedParams, sender, appID, secondGroup);
+  
+  })
 
-    await tryExecute(secondAtc, algodClient);
-  };
-
-  for await (const [index, box] of boxData.entries()) {
-    await processBox(box, index);
-  }
-
+  await Promise.all(boxPromises)
   if (Buffer.concat(boxData).toString('hex') !== data.toString('hex')) throw new Error('Data validation failed!');
 
   await appClient.call({
