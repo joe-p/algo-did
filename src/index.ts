@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop */
+/* eslint-disable no-restricted-syntax */
 import algosdk, { ABIMethod, ABIResult } from 'algosdk';
 import { ApplicationClient } from '@algorandfoundation/algokit-utils/types/app-client';
 import appSpec from '../contracts/artifacts/AlgoDID.json';
@@ -15,7 +17,7 @@ const BYTES_PER_CALL = 2048
 - 8 // 8 bytes for the box index
 - 8; // 8 bytes for the offset
 
-export type Metadata = {start: bigint, end: bigint, uploading: bigint, endSize: bigint};
+export type Metadata = {start: bigint, end: bigint, status: bigint, endSize: bigint};
 
 export async function resolveDID(did: string, algodClient: algosdk.Algodv2): Promise<Buffer> {
   const splitDid = did.split(':');
@@ -48,13 +50,14 @@ export async function resolveDID(did: string, algodClient: algosdk.Algodv2): Pro
     app: JSON.stringify(appSpec),
   }, algodClient);
 
-  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64,uint64)'))).valueOf() as bigint[];
 
   const metadata: Metadata = {
-    start: boxValue[0], end: boxValue[1], uploading: boxValue[2], endSize: boxValue[3],
+    start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
   };
 
-  if (metadata.uploading) throw new Error('DID document is still being uploaded');
+  if (metadata.status === BigInt(0)) throw new Error('DID document is still being uploaded');
+  if (metadata.status === BigInt(2)) throw new Error('DID document is being deleted');
 
   const boxPromises = [];
   for (let i = metadata.start; i <= metadata.end; i += 1n) {
@@ -109,6 +112,44 @@ export async function sendTxGroup(
 
 /**
  * 
+ * @param atc 
+ * @param algodClient 
+ * @param retryCount 
+ */
+async function tryExecute(
+  atc: algosdk.AtomicTransactionComposer,
+  algodClient: algosdk.Algodv2,
+  retryCount = 1,
+): Promise<void> {
+  try {
+    await atc.execute(algodClient, 3);
+  } catch (e) {
+    if (retryCount === 3) {
+      // TODO: SDK bugfix
+      // const execTraceConfig = new algosdk.modelsv2.SimulateTraceConfig({
+      //   enable: true,
+      //   stackChange: true,
+      //   stateChange: true,
+      //   scratchChange: true,
+      // });
+
+      // const simReq = new algosdk.modelsv2.SimulateRequest({
+      //   txnGroups: [],
+      //   execTraceConfig,
+      // });
+      // const result = await atc.simulate(algodClient, simReq);
+
+      // console.warn(result.simulateResponse.txnGroups[0].txnResults[0].execTrace);
+      throw e;
+    }
+
+    // eslint-disable-next-line no-console
+    console.warn(`Failed to send transaction group. Retrying in ${500 * retryCount}ms (${retryCount / 3})`);
+}
+}
+
+/**
+ * 
  * @param data 
  * @param appID 
  * @param pubKey 
@@ -138,7 +179,7 @@ export async function uploadDIDDocument(
   + (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
   + ceilBoxes * 8 * COST_PER_BYTE // cost of data keys
   + endBoxSize * COST_PER_BYTE // cost of last data box
-  + COST_PER_BOX + (8 + 8 + 1 + 8 + 32) * COST_PER_BYTE; // cost of metadata box
+  + COST_PER_BOX + (8 + 8 + 1 + 8 + 32 + 8) * COST_PER_BYTE; // cost of metadata box
 
   const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
     from: sender.addr,
@@ -157,10 +198,10 @@ export async function uploadDIDDocument(
   });
   expect(appCallResult).toBeDefined();
 
-  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64)'))).valueOf() as bigint[];
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64,uint64)'))).valueOf() as bigint[];
 
   const metadata: Metadata = {
-    start: boxValue[0], end: boxValue[1], uploading: boxValue[2], endSize: boxValue[3],
+    start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
   };
 
   const numBoxes = Math.floor(data.byteLength / MAX_BOX_SIZE);
@@ -198,9 +239,10 @@ export async function uploadDIDDocument(
     if (secondGroup.length === 0) return;
 
     await sendTxGroup(algodClient, appClient.getABIMethod('upload')!, 8, pubKey, boxes, boxIndex, suggestedParams, sender, appID, secondGroup);
-  });
+  
+  })
 
-  await Promise.all(boxPromises);
+  await Promise.all(boxPromises)
   if (Buffer.concat(boxData).toString('hex') !== data.toString('hex')) throw new Error('Data validation failed!');
 
   await appClient.call({
@@ -213,4 +255,108 @@ export async function uploadDIDDocument(
   });
 
   return metadata;
+}
+
+/*
+export async function uploadDIDDocument(
+  data: Buffer,
+  appID: number,
+  pubKey: Uint8Array,
+  sender: algosdk.Account,
+  algodClient: algosdk.Algodv2,
+): Promise<Metadata> {
+  */
+export async function deleteDIDDocument(
+  appID: number,
+  pubKey: Uint8Array,
+  sender: algosdk.Account,
+  algodClient: algosdk.Algodv2,
+): Promise<void> {
+  const appClient = new ApplicationClient({
+    resolveBy: 'id',
+    id: appID,
+    sender: algosdk.generateAccount(),
+    app: JSON.stringify(appSpec),
+  }, algodClient);
+
+  const boxValue = (await appClient.getBoxValueFromABIType(pubKey, algosdk.ABIType.from('(uint64,uint64,uint8,uint64,uint64)'))).valueOf() as bigint[];
+
+  const metadata: Metadata = {
+    start: boxValue[0], end: boxValue[1], status: boxValue[2], endSize: boxValue[3],
+  };
+
+  await appClient.call({
+    method: 'startDelete',
+    methodArgs: [pubKey],
+    boxes: [
+      pubKey,
+    ],
+    sender,
+    sendParams: { suppressLog: true },
+  });
+
+  const suggestedParams = await algodClient.getTransactionParams().do();
+
+  const atcs: {boxIndex: bigint, atc: algosdk.AtomicTransactionComposer}[] = [];
+  for (let boxIndex = metadata.start; boxIndex <= metadata.end; boxIndex += 1n) {
+    const atc = new algosdk.AtomicTransactionComposer();
+    const boxIndexRef = { appIndex: appID, name: algosdk.encodeUint64(boxIndex) };
+    atc.addMethodCall({
+      appID,
+      method: appClient.getABIMethod('deleteData')!,
+      methodArgs: [pubKey, boxIndex],
+      boxes: [
+        { appIndex: appID, name: pubKey },
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+        boxIndexRef,
+      ],
+      suggestedParams: { ...suggestedParams, fee: 2000, flatFee: true },
+      sender: sender.addr,
+      signer: algosdk.makeBasicAccountTransactionSigner(sender),
+    });
+
+    for (let i = 0; i < 4; i += 1) {
+      atc.addMethodCall({
+        appID,
+        method: appClient.getABIMethod('dummy')!,
+        methodArgs: [],
+        boxes: [
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+          boxIndexRef,
+        ],
+        suggestedParams,
+        sender: sender.addr,
+        signer: algosdk.makeBasicAccountTransactionSigner(sender),
+        note: new Uint8Array(Buffer.from(`dummy ${i}`)),
+      });
+    }
+
+    atcs.push({ atc, boxIndex });
+  }
+
+  for await (const atcAndIndex of atcs) {
+    await tryExecute(atcAndIndex.atc, algodClient);
+  }
+}
+
+export async function updateDIDDocument(
+  data: Buffer,
+  appID: number,
+  pubKey: Uint8Array,
+  sender: algosdk.Account,
+  algodClient: algosdk.Algodv2,
+): Promise<Metadata> {
+  await deleteDIDDocument(appID, pubKey, sender, algodClient);
+  return uploadDIDDocument(data, appID, pubKey, sender, algodClient);
 }
