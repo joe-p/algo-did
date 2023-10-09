@@ -1,17 +1,35 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Contract } from '@algorandfoundation/tealscript';
 
-const UPLOADING: uint<8> = 0;
-const READY: uint<8> = 1;
-const DELETING: uint<8> = 2;
+/** Metadata about DID Document data */
+type Metadata = {
+  /** start - The index of the box at which the data starts */
+  start: uint64,
 
-/*
-start - The index of the box at which the data starts
-end - The index of the box at which the data ends
-status - 0 if uploading, 1 if ready, 2 if deleting
-endSize - The size of the last box
-*/
-type Metadata = {start: uint64, end: uint64, status: uint<8>, endSize: uint64, lastDeleted: uint64};
+  /** end - The index of the box at which the data ends */
+  end: uint64,
+
+  /** status - 0 if uploading, 1 if ready, 2 if deleting */
+  status: uint<8>,
+
+  /** The size of the last box */
+  endSize: uint64,
+
+  /**
+   * The index of the last box that was deleted. Used to ensure all boxes are deleted in order
+   * To prevent any missed boxes (thus missed MBR refund)
+   */
+  lastDeleted: uint64
+};
+
+/** Indicates the data is still being uploaded */
+const UPLOADING: uint<8> = 0;
+
+/** Indicates the data is done uploading and can be safely read */
+const READY: uint<8> = 1;
+
+/** Indicates the data is currently being deleted */
+const DELETING: uint<8> = 2;
 
 const COST_PER_BYTE = 400;
 const COST_PER_BOX = 2500;
@@ -19,18 +37,14 @@ const MAX_BOX_SIZE = 32768;
 
 // eslint-disable-next-line no-unused-vars
 class AlgoDID extends Contract {
-  // The boxes that contain the data, indexed by uint64
+  /** The boxes that contain the data, indexed by uint64 */
   dataBoxes = BoxMap<uint64, bytes>();
 
-  // Metadata for a given pubkey
+  /** Metadata for a given pubkey */
   metadata = BoxMap<Address, Metadata>();
 
-  // The index of the next box to be created
+  /** The index of the next box to be created */
   currentIndex = GlobalStateKey<uint64>();
-
-  createApplication(): void {
-    this.currentIndex.value = 1;
-  }
 
   /**
    *
@@ -140,11 +154,8 @@ class AlgoDID extends Contract {
 
     this.dataBoxes(boxIndex).delete();
 
-    if (boxIndex === metadata.end) {
-      this.metadata(pubKey).delete();
-    } else {
-      metadata.lastDeleted = boxIndex;
-    }
+    if (boxIndex === metadata.end) this.metadata(pubKey).delete();
+    else metadata.lastDeleted = boxIndex;
 
     sendPayment({
       amount: preMBR - globals.currentApplicationAddress.minBalance,
@@ -153,14 +164,17 @@ class AlgoDID extends Contract {
   }
 
   /**
-   * Dummy function to add extra box references for deleteData
-   */
-  dummy(): void {}
-
-  /**
    * Allow the contract to be updated by the creator
    */
   updateApplication(): void {
-    assert(globals.creatorAddress === this.txn.sender);
+    assert(this.txn.sender === globals.creatorAddress);
   }
+
+  /**
+   * Dummy function to add extra box references for deleteData.
+   * Boxes are 32k, but a single app call can only inlcude enough references to read/write 8k
+   * at a time. Thus when a box is deleted, we need to add additional dummy calls with box
+   * references to increase the total read/write budget to 32k.
+   */
+  dummy(): void {}
 }
