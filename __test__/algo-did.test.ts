@@ -13,17 +13,35 @@ import {
 } from '../src/index';
 
 describe('Algorand DID', () => {
+  /**
+   * Large data (> 32k) to simulate a large DID Document
+   * that needs to be put into multiple boxes
+   */
   const bigData = fs.readFileSync(`${__dirname}/TEAL.pdf`);
+
+  /**
+   * Small data (< 32k) to simulate a small DID Document
+   * that can fit into a single box
+   */
   const smallJSONObject = { keyOne: 'foo', keyTwo: 'bar' };
-  let appClient: ApplicationClient;
-  let sender: algosdk.Account;
 
   /** The public key for the user in the tests that has a big DID Document */
   const bigDataUserKey = algosdk.decodeAddress(algosdk.generateAccount().addr).publicKey;
+
   /** The public key for the user in the tests that has a small DID Document */
   const smallDataUserKey = algosdk.decodeAddress(algosdk.generateAccount().addr).publicKey;
+
   /** The public key for the user in the tests that updates their DID Document */
   const updateDataUserKey = algosdk.decodeAddress(algosdk.generateAccount().addr).publicKey;
+
+  /** algokti appClient for interacting with the contract */
+  let appClient: ApplicationClient;
+
+  /** The account that will be used to create and call the contract */
+  let sender: algosdk.Account;
+
+  /** The ID of the contract */
+  let appId: number;
 
   beforeAll(async () => {
     sender = await algokit.getDispenserAccount(algodClient, kmdClient);
@@ -41,73 +59,65 @@ describe('Algorand DID', () => {
       amount: algokit.microAlgos(100_000),
       sendParams: { suppressLog: true },
     });
+
+    appId = Number((await appClient.getAppReference()).appId);
   });
 
   describe('uploadDIDDocument', () => {
-    it('uploads big (multi-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
-
+    const uploadDIDDocumentTest = async (documentData: Buffer, userKey: Uint8Array) => {
+      // Upload the DID Document and ensure there is no error
+      // Resolution is in the next test
       await uploadDIDDocument(
-        bigData,
-        Number(appId),
-        bigDataUserKey,
+        documentData,
+        appId,
+        userKey,
         sender,
         algodClient,
       );
+    };
+
+    it('uploads big (multi-box) data', async () => {
+      await uploadDIDDocumentTest(bigData, bigDataUserKey);
     });
 
     it('uploads small (single-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
       const data = Buffer.from(JSON.stringify(smallJSONObject));
-
-      await uploadDIDDocument(
-        data,
-        Number(appId),
-        smallDataUserKey,
-        sender,
-        algodClient,
-      );
+      await uploadDIDDocumentTest(data, smallDataUserKey);
     });
   });
 
   describe('resolveDID', () => {
     it('resolves big (multi-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
-
       const addr = algosdk.encodeAddress(bigDataUserKey);
-
       const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
 
+      // Expect binary data to match
       expect(resolvedData.toString('hex')).toEqual(bigData.toString('hex'));
     });
 
     it('resolves small (single-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
-
       const addr = algosdk.encodeAddress(smallDataUserKey);
-
       const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
 
+      // Expect JSON object to match
       expect(resolvedData.toString()).toEqual(JSON.stringify(smallJSONObject));
     });
   });
 
   describe('deleteDIDDocument', () => {
-    it('deletes big (multi-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
-      await deleteDIDDocument(Number(appId), bigDataUserKey, sender, algodClient);
+    const deleteDIDDocumentTest = async (userKey: Uint8Array) => {
+      await deleteDIDDocument(appId, userKey, sender, algodClient);
 
-      const addr = algosdk.encodeAddress(bigDataUserKey);
+      const addr = algosdk.encodeAddress(userKey);
       await expect(resolveDID(`did:algo:${addr}-${appId}`, algodClient)).rejects.toThrow();
+    };
+
+    it('deletes big (multi-box) data', async () => {
+      await deleteDIDDocumentTest(bigDataUserKey);
     });
 
     it('deletes small (single-box) data', async () => {
-      const { appId } = await appClient.getAppReference();
-
-      await deleteDIDDocument(Number(appId), smallDataUserKey, sender, algodClient);
-
-      const addr = algosdk.encodeAddress(smallDataUserKey);
-      await expect(resolveDID(`did:algo:${addr}-${appId}`, algodClient)).rejects.toThrow();
+      await deleteDIDDocumentTest(smallDataUserKey);
     });
 
     it('returns MBR', async () => {
@@ -120,30 +130,28 @@ describe('Algorand DID', () => {
 
   describe('updateDocument', () => {
     beforeAll(async () => {
-      const { appId } = await appClient.getAppReference();
-
+      // Initially upload the big data as the DID Document
       await uploadDIDDocument(
         bigData,
-        Number(appId),
+        appId,
         updateDataUserKey,
         sender,
         algodClient,
       );
     });
 
-    it('resolves new data', async () => {
-      const { appId } = await appClient.getAppReference();
+    it('uploads and resolves new data', async () => {
+      // Update the DID Document to be the small data
       const data = Buffer.from(JSON.stringify(smallJSONObject));
-
       await updateDIDDocument(
         data,
-        Number(appId),
+        appId,
         updateDataUserKey,
         sender,
         algodClient,
       );
-      const addr = algosdk.encodeAddress(updateDataUserKey);
 
+      const addr = algosdk.encodeAddress(updateDataUserKey);
       const resolvedData = await resolveDID(`did:algo:${addr}-${appId}`, algodClient);
 
       expect(resolvedData.toString()).toEqual(JSON.stringify(smallJSONObject));
