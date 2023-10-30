@@ -39,33 +39,6 @@ var (
 	MAX_BOX_SIZE  = 32768
 )
 
-/*
-const ceilBoxes = Math.ceil(data.byteLength / MAX_BOX_SIZE);
-
-const endBoxSize = data.byteLength % MAX_BOX_SIZE;
-
-const totalCost = ceilBoxes * COST_PER_BOX // cost of data boxes
-+ (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
-+ ceilBoxes * 8 * COST_PER_BYTE // cost of data keys
-+ endBoxSize * COST_PER_BYTE // cost of last data box
-+ COST_PER_BOX + (8 + 8 + 1 + 8 + 32 + 8) * COST_PER_BYTE; // cost of metadata box
-
-	const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-		from: sender.addr,
-		to: (await appClient.getAppReference()).appAddress,
-		amount: totalCost,
-		suggestedParams: await algodClient.getTransactionParams().do(),
-	});
-
-	const appCallResult: AppCallTransactionResult = await appClient.call({
-		method: 'startUpload',
-		methodArgs: [pubKey, ceilBoxes, endBoxSize, mbrPayment],
-		boxes: [
-		pubKey,
-		],
-		sendParams: { suppressLog: true },
-	});
-*/
 func GetKmdClient() kmd.Client {
 	kmdClient, err := kmd.MakeClient(
 		KMD_ADDRESS,
@@ -235,6 +208,33 @@ func CreateApp(
 	return confirmedTxn.ApplicationIndex
 }
 
+/*
+const ceilBoxes = Math.ceil(data.byteLength / MAX_BOX_SIZE);
+
+const endBoxSize = data.byteLength % MAX_BOX_SIZE;
+
+const totalCost = ceilBoxes * COST_PER_BOX // cost of data boxes
++ (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
++ ceilBoxes * 8 * COST_PER_BYTE // cost of data keys
++ endBoxSize * COST_PER_BYTE // cost of last data box
++ COST_PER_BOX + (8 + 8 + 1 + 8 + 32 + 8) * COST_PER_BYTE; // cost of metadata box
+
+	const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+		from: sender.addr,
+		to: (await appClient.getAppReference()).appAddress,
+		amount: totalCost,
+		suggestedParams: await algodClient.getTransactionParams().do(),
+	});
+
+	const appCallResult: AppCallTransactionResult = await appClient.call({
+		method: 'startUpload',
+		methodArgs: [pubKey, ceilBoxes, endBoxSize, mbrPayment],
+		boxes: [
+		pubKey,
+		],
+		sendParams: { suppressLog: true },
+	});
+*/
 func StartUpload(
 	algodClient *algod.Client,
 	appID uint64,
