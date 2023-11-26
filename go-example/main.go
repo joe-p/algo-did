@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -34,9 +36,10 @@ var (
 	KMD_WALLET_NAME     = "unencrypted-default-wallet"
 	KMD_WALLET_PASSWORD = ""
 
-	COST_PER_BYTE = 400
-	COST_PER_BOX  = 2500
-	MAX_BOX_SIZE  = 32768
+	COST_PER_BYTE  = 400
+	COST_PER_BOX   = 2500
+	MAX_BOX_SIZE   = 32768
+	BYTES_PER_CALL = 2048 - 4 - 34 - 8 - 8
 )
 
 func GetKmdClient() kmd.Client {
@@ -312,6 +315,82 @@ func StartUpload(
 	if err != nil {
 		log.Fatalf("failed to execute atomic transaction: %s", err)
 	}
+
+	boxValue, err := algodClient.GetApplicationBoxByName(appID, pubKey).Do(context.Background())
+	if err != nil {
+		log.Fatalf("failed to read metadata box: %s", err)
+	}
+
+	metadataType, err := abi.TypeOf("(uint64,uint64,uint8,uint64,uint64)")
+	if err != nil {
+		log.Fatalf("failed to get type of metadata: %s", err)
+	}
+
+	metadata, err := metadataType.Decode(boxValue.Value)
+
+	start := metadata.([]interface{})[0].(uint64)
+	end := metadata.([]interface{})[1].(uint64)
+	status := metadata.([]interface{})[2].(uint8)
+	endSize := metadata.([]interface{})[3].(uint64)
+
+	fmt.Printf("start: %d\n", start)
+	fmt.Printf("end: %d\n", end)
+	fmt.Printf("status: %d\n", status)
+	fmt.Printf("endSize: %d\n", endSize)
+
+	numBoxes := int(math.Floor(float64(len(data)) / float64(MAX_BOX_SIZE)))
+
+	fmt.Printf("numBoxes: %d\n", numBoxes)
+
+	boxData := [][]byte{}
+	for i := 0; i < numBoxes; i++ {
+		upperBound := (i + 1) * MAX_BOX_SIZE
+		if len(data) < upperBound {
+			upperBound = len(data)
+		}
+		box := data[i*MAX_BOX_SIZE : upperBound]
+		boxData = append(boxData, box)
+	}
+
+	// add data for the last box
+	if len(data) > MAX_BOX_SIZE {
+		boxData = append(boxData, data[numBoxes*MAX_BOX_SIZE:])
+	}
+
+	for boxIndexOffset, box := range boxData {
+		boxIndex := start + uint64(boxIndexOffset)
+		encodedBoxIndex := make([]byte, 8)
+		binary.BigEndian.PutUint64(encodedBoxIndex, boxIndex)
+
+		numChunks := int(math.Ceil(float64(len(box)) / float64(BYTES_PER_CALL)))
+
+		chunks := [][]byte{}
+		for i := 0; i < numChunks; i++ {
+			upperBound := (i + 1) * BYTES_PER_CALL
+			if len(box) < upperBound {
+				upperBound = len(box)
+			}
+			chunks = append(chunks, box[i*BYTES_PER_CALL:upperBound])
+		}
+
+		boxRef := types.AppBoxReference{AppID: appID, Name: encodedBoxIndex}
+		boxes := []types.AppBoxReference{}
+		for i := 0; i < 7; i++ {
+			boxes = append(boxes, boxRef)
+		}
+
+		boxes = append(boxes, types.AppBoxReference{AppID: appID, Name: pubKey})
+
+		fmt.Printf("boxIndex: %d\n", boxIndex)
+		fmt.Printf("numChunks: %d\n", numChunks)
+		// firstGroup := chunks[:8]
+		// secondGroup := chunks[8:]
+
+		// sendTxGroup
+		// if len(secondGroup) > 0 {
+		// 	sendTxGroup
+		// }
+	}
 }
 
 func main() {
@@ -345,13 +424,17 @@ func main() {
 
 	appID := CreateApp(algodClient, contract, sender.Address, signer)
 
+	data := make([]byte, 64_000)
+	rand.Read(data)
+
 	StartUpload(
 		algodClient,
 		appID,
 		contract,
 		sender.Address,
 		signer,
-		[]byte("hello world"),
+		// []byte("hello world"),
+		data,
 		sender.PublicKey,
 	)
 }
