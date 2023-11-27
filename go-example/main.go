@@ -212,32 +212,71 @@ func CreateApp(
 }
 
 /*
-const ceilBoxes = Math.ceil(data.byteLength / MAX_BOX_SIZE);
+export async function sendTxGroup(
+  algodClient: algosdk.Algodv2,
+  abiMethod: ABIMethod,
+  bytesOffset: number,
+  pubKey: Uint8Array,
+  boxes: algosdk.BoxReference[],
+  boxIndex: bigint,
+  suggestedParams: SuggestedParamsWithMinFee,
+  sender: algosdk.Account,
+  appID: number,
+  group: Buffer[],
+): Promise<string[]> {
+  const atc = new algosdk.AtomicTransactionComposer();
+  group.forEach((chunk, i) => {
+    atc.addMethodCall({
+      method: abiMethod!,
+      methodArgs: [pubKey, boxIndex, BYTES_PER_CALL * (i + bytesOffset), chunk],
+      boxes,
+      suggestedParams,
+      sender: sender.addr,
+      signer: algosdk.makeBasicAccountTransactionSigner(sender),
+      appID,
+    });
+  });
 
-const endBoxSize = data.byteLength % MAX_BOX_SIZE;
-
-const totalCost = ceilBoxes * COST_PER_BOX // cost of data boxes
-+ (ceilBoxes - 1) * MAX_BOX_SIZE * COST_PER_BYTE // cost of data
-+ ceilBoxes * 8 * COST_PER_BYTE // cost of data keys
-+ endBoxSize * COST_PER_BYTE // cost of last data box
-+ COST_PER_BOX + (8 + 8 + 1 + 8 + 32 + 8) * COST_PER_BYTE; // cost of metadata box
-
-	const mbrPayment = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-		from: sender.addr,
-		to: (await appClient.getAppReference()).appAddress,
-		amount: totalCost,
-		suggestedParams: await algodClient.getTransactionParams().do(),
-	});
-
-	const appCallResult: AppCallTransactionResult = await appClient.call({
-		method: 'startUpload',
-		methodArgs: [pubKey, ceilBoxes, endBoxSize, mbrPayment],
-		boxes: [
-		pubKey,
-		],
-		sendParams: { suppressLog: true },
-	});
+  await new Promise((r) => setTimeout(r, 2000));
+  return (await atc.execute(algodClient, 3)).txIDs;
+}
 */
+
+func SendTxGroup(
+	algodClient *algod.Client,
+	abiMethod abi.Method,
+	bytesOffset int,
+	pubKey []byte,
+	boxes []types.AppBoxReference,
+	boxIndex uint64,
+	suggestedParams types.SuggestedParams,
+	sender types.Address,
+	signer transaction.TransactionSigner,
+	appID uint64,
+	group [][]byte,
+) []string {
+	atc := transaction.AtomicTransactionComposer{}
+
+	for i, chunk := range group {
+		atc.AddMethodCall(transaction.AddMethodCallParams{
+			Method:          abiMethod,
+			MethodArgs:      []interface{}{pubKey, boxIndex, BYTES_PER_CALL * (i + bytesOffset), chunk},
+			BoxReferences:   boxes,
+			SuggestedParams: suggestedParams,
+			Sender:          sender,
+			Signer:          signer,
+			AppID:           appID,
+		})
+	}
+
+	result, err := atc.Execute(algodClient, context.Background(), 3)
+	if err != nil {
+		log.Fatalf("failed to execute atomic transaction: %s", err)
+	}
+
+	return result.TxIDs
+}
+
 func StartUpload(
 	algodClient *algod.Client,
 	appID uint64,
@@ -383,13 +422,17 @@ func StartUpload(
 
 		fmt.Printf("boxIndex: %d\n", boxIndex)
 		fmt.Printf("numChunks: %d\n", numChunks)
-		// firstGroup := chunks[:8]
-		// secondGroup := chunks[8:]
 
-		// sendTxGroup
-		// if len(secondGroup) > 0 {
-		// 	sendTxGroup
-		// }
+		uploadMethod, err := contract.GetMethodByName("upload")
+		if err != nil {
+			log.Fatalf("failed to get add method: %s", err)
+		}
+
+		SendTxGroup(algodClient, uploadMethod, 0, pubKey, boxes, boxIndex, sp, sender, signer, appID, chunks[:8])
+
+		if numChunks > 8 {
+			SendTxGroup(algodClient, uploadMethod, 0, pubKey, boxes, boxIndex, sp, sender, signer, appID, chunks[8:])
+		}
 	}
 }
 
