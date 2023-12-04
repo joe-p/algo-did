@@ -42,6 +42,19 @@ var (
 	BYTES_PER_CALL = 2048 - 4 - 34 - 8 - 8
 )
 
+/*
+start := metadata.([]interface{})[0].(uint64)
+end := metadata.([]interface{})[1].(uint64)
+status := metadata.([]interface{})[2].(uint8)
+endSize := metadata.([]interface{})[3].(uint64)
+*/
+type Metadata struct {
+	Start   uint64
+	End     uint64
+	Status  uint8
+	EndSize uint64
+}
+
 func GetKmdClient() kmd.Client {
 	kmdClient, err := kmd.MakeClient(
 		KMD_ADDRESS,
@@ -211,37 +224,6 @@ func CreateApp(
 	return confirmedTxn.ApplicationIndex
 }
 
-/*
-export async function sendTxGroup(
-  algodClient: algosdk.Algodv2,
-  abiMethod: ABIMethod,
-  bytesOffset: number,
-  pubKey: Uint8Array,
-  boxes: algosdk.BoxReference[],
-  boxIndex: bigint,
-  suggestedParams: SuggestedParamsWithMinFee,
-  sender: algosdk.Account,
-  appID: number,
-  group: Buffer[],
-): Promise<string[]> {
-  const atc = new algosdk.AtomicTransactionComposer();
-  group.forEach((chunk, i) => {
-    atc.addMethodCall({
-      method: abiMethod!,
-      methodArgs: [pubKey, boxIndex, BYTES_PER_CALL * (i + bytesOffset), chunk],
-      boxes,
-      suggestedParams,
-      sender: sender.addr,
-      signer: algosdk.makeBasicAccountTransactionSigner(sender),
-      appID,
-    });
-  });
-
-  await new Promise((r) => setTimeout(r, 2000));
-  return (await atc.execute(algodClient, 3)).txIDs;
-}
-*/
-
 func SendTxGroup(
 	algodClient *algod.Client,
 	abiMethod abi.Method,
@@ -277,7 +259,32 @@ func SendTxGroup(
 	return result.TxIDs
 }
 
-func StartUpload(
+func GetMetadata(appID uint64, pubKey []byte, algodClient *algod.Client) Metadata {
+	boxValue, err := algodClient.GetApplicationBoxByName(appID, pubKey).Do(context.Background())
+	if err != nil {
+		log.Fatalf("failed to read metadata box: %s", err)
+	}
+
+	metadataType, err := abi.TypeOf("(uint64,uint64,uint8,uint64,uint64)")
+	if err != nil {
+		log.Fatalf("failed to get type of metadata: %s", err)
+	}
+
+	metadata, err := metadataType.Decode(boxValue.Value)
+
+	if err != nil {
+		log.Fatalf("failed to decode metadata: %s", err)
+	}
+
+	return Metadata{
+		Start:   metadata.([]interface{})[0].(uint64),
+		End:     metadata.([]interface{})[1].(uint64),
+		Status:  metadata.([]interface{})[2].(uint8),
+		EndSize: metadata.([]interface{})[3].(uint64),
+	}
+}
+
+func UploadDIDDocument(
 	algodClient *algod.Client,
 	appID uint64,
 	contract *abi.Contract,
@@ -355,27 +362,12 @@ func StartUpload(
 		log.Fatalf("failed to execute atomic transaction: %s", err)
 	}
 
-	boxValue, err := algodClient.GetApplicationBoxByName(appID, pubKey).Do(context.Background())
-	if err != nil {
-		log.Fatalf("failed to read metadata box: %s", err)
-	}
+	metadata := GetMetadata(appID, pubKey, algodClient)
 
-	metadataType, err := abi.TypeOf("(uint64,uint64,uint8,uint64,uint64)")
-	if err != nil {
-		log.Fatalf("failed to get type of metadata: %s", err)
-	}
-
-	metadata, err := metadataType.Decode(boxValue.Value)
-
-	start := metadata.([]interface{})[0].(uint64)
-	end := metadata.([]interface{})[1].(uint64)
-	status := metadata.([]interface{})[2].(uint8)
-	endSize := metadata.([]interface{})[3].(uint64)
-
-	fmt.Printf("start: %d\n", start)
-	fmt.Printf("end: %d\n", end)
-	fmt.Printf("status: %d\n", status)
-	fmt.Printf("endSize: %d\n", endSize)
+	fmt.Printf("start: %d\n", metadata.Start)
+	fmt.Printf("end: %d\n", metadata.End)
+	fmt.Printf("status: %d\n", metadata.Start)
+	fmt.Printf("endSize: %d\n", metadata.EndSize)
 
 	numBoxes := int(math.Floor(float64(len(data)) / float64(MAX_BOX_SIZE)))
 
@@ -397,7 +389,7 @@ func StartUpload(
 	}
 
 	for boxIndexOffset, box := range boxData {
-		boxIndex := start + uint64(boxIndexOffset)
+		boxIndex := metadata.Start + uint64(boxIndexOffset)
 		encodedBoxIndex := make([]byte, 8)
 		binary.BigEndian.PutUint64(encodedBoxIndex, boxIndex)
 
@@ -432,6 +424,223 @@ func StartUpload(
 
 		if numChunks > 8 {
 			SendTxGroup(algodClient, uploadMethod, 0, pubKey, boxes, boxIndex, sp, sender, signer, appID, chunks[8:])
+		}
+	}
+
+	/*
+	  await appClient.call({
+	    method: 'finishUpload',
+	    methodArgs: [pubKey],
+	    boxes: [
+	      pubKey,
+	    ],
+	    sendParams: { suppressLog: true },
+	  });
+	*/
+
+	finishUploadMethod, err := contract.GetMethodByName("finishUpload")
+	if err != nil {
+		log.Fatalf("failed to get add method: %s", err)
+	}
+
+	finishUploadMcp := transaction.AddMethodCallParams{
+		AppID:           appID,
+		Sender:          sender,
+		SuggestedParams: sp,
+		OnComplete:      types.NoOpOC,
+		Signer:          signer,
+		Method:          finishUploadMethod,
+		BoxReferences:   []types.AppBoxReference{{AppID: appID, Name: pubKey}},
+		MethodArgs:      []interface{}{pubKey},
+	}
+
+	finishAtc := transaction.AtomicTransactionComposer{}
+	if err := finishAtc.AddMethodCall(finishUploadMcp); err != nil {
+		log.Fatalf("failed to add method call: %s", err)
+	}
+
+	_, err = finishAtc.Execute(algodClient, context.Background(), 3)
+}
+
+/*
+export async function deleteDIDDocument(
+
+	appID: number,
+	pubKey: Uint8Array,
+	sender: algosdk.Account,
+	algodClient: algosdk.Algodv2,
+
+	): Promise<void> {
+*/
+func DeleteDIDDocument(
+	appID uint64,
+	pubKey []byte,
+	sender types.Address,
+	algodClient *algod.Client,
+	contract *abi.Contract,
+	signer transaction.TransactionSigner,
+) {
+	startAtc := transaction.AtomicTransactionComposer{}
+
+	method, err := contract.GetMethodByName("startDelete")
+	if err != nil {
+		log.Fatalf("failed to get add method: %s", err)
+	}
+
+	sp, err := algodClient.SuggestedParams().Do(context.Background())
+	if err != nil {
+		log.Fatalf("failed to get suggested params: %s", err)
+	}
+
+	byteType, err := abi.TypeOf("address")
+	if err != nil {
+		log.Fatalf("failed to get type of address: %s", err)
+	}
+
+	pubKeyAbiValue, err := byteType.Encode(pubKey)
+	if err != nil {
+		log.Fatalf("failed to encode pubKey: %s", err)
+	}
+
+	mcp := transaction.AddMethodCallParams{
+		AppID:           appID,
+		Sender:          sender,
+		SuggestedParams: sp,
+		OnComplete:      types.NoOpOC,
+		Signer:          signer,
+		Method:          method,
+		BoxReferences:   []types.AppBoxReference{{AppID: appID, Name: pubKey}},
+		MethodArgs:      []interface{}{pubKeyAbiValue},
+	}
+
+	if err := startAtc.AddMethodCall(mcp); err != nil {
+		log.Fatalf("failed to add method call: %s", err)
+	}
+
+	_, err = startAtc.Execute(algodClient, context.Background(), 3)
+
+	if err != nil {
+		log.Fatalf("failed to execute atomic transaction: %s", err)
+	}
+
+	metadata := GetMetadata(appID, pubKey, algodClient)
+
+	/*
+	 const atcs: {boxIndex: bigint, atc: algosdk.AtomicTransactionComposer}[] = [];
+	  for (let boxIndex = metadata.start; boxIndex <= metadata.end; boxIndex += 1n) {
+	    const atc = new algosdk.AtomicTransactionComposer();
+	    const boxIndexRef = { appIndex: appID, name: algosdk.encodeUint64(boxIndex) };
+	    atc.addMethodCall({
+	      appID,
+	      method: appClient.getABIMethod('deleteData')!,
+	      methodArgs: [pubKey, boxIndex],
+	      boxes: [
+	        { appIndex: appID, name: pubKey },
+	        boxIndexRef,
+	        boxIndexRef,
+	        boxIndexRef,
+	        boxIndexRef,
+	        boxIndexRef,
+	        boxIndexRef,
+	        boxIndexRef,
+	      ],
+	      suggestedParams: { ...suggestedParams, fee: 2000, flatFee: true },
+	      sender: sender.addr,
+	      signer: algosdk.makeBasicAccountTransactionSigner(sender),
+	    });
+
+	    for (let i = 0; i < 4; i += 1) {
+	      atc.addMethodCall({
+	        appID,
+	        method: appClient.getABIMethod('dummy')!,
+	        methodArgs: [],
+	        boxes: [
+	          boxIndexRef,
+	          boxIndexRef,
+	          boxIndexRef,
+	          boxIndexRef,
+	          boxIndexRef,
+	          boxIndexRef,
+	          boxIndexRef,
+	          boxIndexRef,
+	        ],
+	        suggestedParams,
+	        sender: sender.addr,
+	        signer: algosdk.makeBasicAccountTransactionSigner(sender),
+	        note: new Uint8Array(Buffer.from(`dummy ${i}`)),
+	      });
+	    }
+
+	    atcs.push({ atc, boxIndex });
+	  }
+
+	*/
+
+	atcs := []struct {
+		boxIndex uint64
+		atc      transaction.AtomicTransactionComposer
+	}{}
+
+	for boxIndex := metadata.Start; boxIndex <= metadata.End; boxIndex++ {
+		atc := transaction.AtomicTransactionComposer{}
+		encodedBoxIndex := make([]byte, 8)
+		binary.BigEndian.PutUint64(encodedBoxIndex, boxIndex)
+
+		boxIndexRef := types.AppBoxReference{AppID: appID, Name: encodedBoxIndex}
+
+		deleteDataMethod, err := contract.GetMethodByName("deleteData")
+		if err != nil {
+			log.Fatalf("failed to get add method: %s", err)
+		}
+
+		sp.Fee = 2000
+		sp.FlatFee = true
+
+		if err := atc.AddMethodCall(transaction.AddMethodCallParams{
+			AppID:           appID,
+			Sender:          sender,
+			SuggestedParams: sp,
+			OnComplete:      types.NoOpOC,
+			Signer:          signer,
+			Method:          deleteDataMethod,
+			BoxReferences:   []types.AppBoxReference{{AppID: appID, Name: pubKey}, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef},
+			MethodArgs:      []interface{}{pubKey, boxIndex},
+		}); err != nil {
+			log.Fatalf("failed to add method call: %s", err)
+		}
+
+		dummyMethod, err := contract.GetMethodByName("dummy")
+		if err != nil {
+			log.Fatalf("failed to get method: %s", err)
+		}
+
+		for i := 0; i < 4; i++ {
+			if err := atc.AddMethodCall(transaction.AddMethodCallParams{
+				AppID:           appID,
+				Sender:          sender,
+				SuggestedParams: sp,
+				OnComplete:      types.NoOpOC,
+				Signer:          signer,
+				Method:          dummyMethod,
+				BoxReferences:   []types.AppBoxReference{boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef, boxIndexRef},
+				MethodArgs:      []interface{}{},
+				Note:            []byte(fmt.Sprintf("dummy %d", i)),
+			}); err != nil {
+				log.Fatalf("failed to add method call: %s", err)
+			}
+		}
+
+		atcs = append(atcs, struct {
+			boxIndex uint64
+			atc      transaction.AtomicTransactionComposer
+		}{boxIndex, atc})
+	}
+
+	for _, atc := range atcs {
+		_, err = atc.atc.Execute(algodClient, context.Background(), 3)
+
+		if err != nil {
+			log.Fatalf("failed to execute atomic transaction: %s", err)
 		}
 	}
 }
@@ -470,14 +679,27 @@ func main() {
 	data := make([]byte, 64_000)
 	rand.Read(data)
 
-	StartUpload(
+	UploadDIDDocument(
 		algodClient,
 		appID,
 		contract,
 		sender.Address,
 		signer,
-		// []byte("hello world"),
 		data,
 		sender.PublicKey,
 	)
+
+	fmt.Println(GetMetadata(appID, sender.PublicKey, algodClient))
+
+	DeleteDIDDocument(
+		appID,
+		sender.PublicKey,
+		sender.Address,
+		algodClient,
+		contract,
+		signer,
+	)
+
+	// Expect "failed to read metadata box: HTTP 404: {"message":"box not found"}"
+	fmt.Println(GetMetadata(appID, sender.PublicKey, algodClient))
 }
