@@ -364,14 +364,7 @@ func UploadDIDDocument(
 
 	metadata := GetMetadata(appID, pubKey, algodClient)
 
-	fmt.Printf("start: %d\n", metadata.Start)
-	fmt.Printf("end: %d\n", metadata.End)
-	fmt.Printf("status: %d\n", metadata.Start)
-	fmt.Printf("endSize: %d\n", metadata.EndSize)
-
 	numBoxes := int(math.Floor(float64(len(data)) / float64(MAX_BOX_SIZE)))
-
-	fmt.Printf("numBoxes: %d\n", numBoxes)
 
 	boxData := [][]byte{}
 	for i := 0; i < numBoxes; i++ {
@@ -412,9 +405,6 @@ func UploadDIDDocument(
 
 		boxes = append(boxes, types.AppBoxReference{AppID: appID, Name: pubKey})
 
-		fmt.Printf("boxIndex: %d\n", boxIndex)
-		fmt.Printf("numChunks: %d\n", numChunks)
-
 		uploadMethod, err := contract.GetMethodByName("upload")
 		if err != nil {
 			log.Fatalf("failed to get add method: %s", err)
@@ -423,7 +413,7 @@ func UploadDIDDocument(
 		SendTxGroup(algodClient, uploadMethod, 0, pubKey, boxes, boxIndex, sp, sender, signer, appID, chunks[:8])
 
 		if numChunks > 8 {
-			SendTxGroup(algodClient, uploadMethod, 0, pubKey, boxes, boxIndex, sp, sender, signer, appID, chunks[8:])
+			SendTxGroup(algodClient, uploadMethod, 8, pubKey, boxes, boxIndex, sp, sender, signer, appID, chunks[8:])
 		}
 	}
 
@@ -645,6 +635,34 @@ func DeleteDIDDocument(
 	}
 }
 
+func ReadData(appID uint64, pubKey []byte, algodClient *algod.Client) []byte {
+	metadata := GetMetadata(appID, pubKey, algodClient)
+
+	if metadata.Status == 0 {
+		log.Fatalf("DID document still being uploaded")
+	}
+
+	if metadata.Status == 2 {
+		log.Fatalf("DID document is being deleted")
+	}
+
+	data := []byte{}
+
+	for i := metadata.Start; i <= metadata.End; i++ {
+		encodedBoxIndex := make([]byte, 8)
+		binary.BigEndian.PutUint64(encodedBoxIndex, i)
+
+		boxValue, err := algodClient.GetApplicationBoxByName(appID, encodedBoxIndex).Do(context.Background())
+		if err != nil {
+			log.Fatalf("failed to read box: %s", err)
+		}
+
+		data = append(data, boxValue.Value...)
+	}
+
+	return data
+}
+
 func main() {
 
 	b, err := os.ReadFile("../contracts/artifacts/AlgoDID.abi.json")
@@ -689,7 +707,7 @@ func main() {
 		sender.PublicKey,
 	)
 
-	fmt.Println(GetMetadata(appID, sender.PublicKey, algodClient))
+	fmt.Println("Data matches:", string(data) == string(ReadData(appID, sender.PublicKey, algodClient)))
 
 	DeleteDIDDocument(
 		appID,
@@ -700,6 +718,6 @@ func main() {
 		signer,
 	)
 
-	// Expect "failed to read metadata box: HTTP 404: {"message":"box not found"}"
+	fmt.Println("The program should fail with the following error: failed to read metadata box: HTTP 404: {\"message\":\"box not found\"}")
 	fmt.Println(GetMetadata(appID, sender.PublicKey, algodClient))
 }
