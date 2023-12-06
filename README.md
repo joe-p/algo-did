@@ -22,11 +22,6 @@ Given a DID (`algo:did:${address}-${appID}`), returns the data stored in box sto
 
 [__test\__/algo-did.test.ts](./__test__/algo-did.test.ts) contains tests for uploading and resolving both big (multi-box) and small (single-box) documents.
 
-# Missing Features
-
-* Currently no way to delete/update documents
-* SDK is missing JSON LD validation for document uploading
-
 # How to run
 
 ## Dependencies
